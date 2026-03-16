@@ -1,0 +1,28 @@
+📁 projet-ai-datalake/
+│
+├── 📁 airflow/                 # Dossier pour l'orchestration (Dags)
+│   └── 📁 dags/
+│       └── pipeline_document.py # Ton workflow global
+│
+├── 📁 backend_processing/      # Le cœur du traitement (IA/OCR)
+│   ├── 📁 scripts/
+│   │   ├── database_manager.py  # Le code que je t'ai donné (Connexion Mongo)
+│   │   ├── ocr_engine.py       # Tâches de tes camarades (Tesseract)
+│   │   └── extraction_nlp.py   # Extraction des entités (NER)
+│   ├── main.py                 # Point d'entrée pour tester les scripts
+│   └── requirements.txt        # Dépendances Python (pymongo, pytesseract, etc.)
+│
+├── 📁 data_lake_config/        # Configuration & Sécurité de ta partie
+│   ├── mongo-init.js           # Script de création des collections & index
+│   └── .env                    # Fichier caché pour tes accès (MONGO_URI)
+│
+├── 📁 frontends/               # Les 2 applications MERN
+│   ├── 📁 cm_app/              # Application Métier / CRM
+│   └── 📁 compliance_tool/     # Outil de conformité
+│
+├── 📁 dataset/                 # Données de test
+│   ├── 📁 raw_samples/         # Tes factures Faker et scans bruités
+│   └── sirene_extract.csv      # Dataset INSEE
+│
+├── docker-compose.yml          # Pour conteneuriser l'ensemble
+└── README.md                   # Documentation du projet
