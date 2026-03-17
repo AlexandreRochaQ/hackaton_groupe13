@@ -45,8 +45,11 @@ class OCR:
         elif isinstance(image, np.ndarray):
             image = Image.fromarray(image)
         
+        # Preprocess image for better OCR results
+        preprocessed = self.preprocess_image(image, enhance=True)
+        
         text = pytesseract.image_to_string(
-            image, 
+            preprocessed if isinstance(preprocessed, Image.Image) else Image.fromarray(preprocessed),
             lang=self.lang, 
             config=self.config
         )
@@ -96,12 +99,33 @@ class OCR:
             image = np.array(image)
         
         if enhance:
+            # Convert to grayscale
             gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
-            enhanced = cv2.GaussianBlur(gray, (5, 5), 0)
-            enhanced = cv2.adaptiveThreshold(
-                enhanced, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+            
+            # Apply denoising
+            denoised = cv2.fastNlMeansDenoising(gray, None, 10, 7, 21)
+            
+            # Apply adaptive thresholding with multiple methods
+            # Method 1: Gaussian adaptive threshold
+            thresh1 = cv2.adaptiveThreshold(
+                denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
                 cv2.THRESH_BINARY, 11, 2
             )
-            return enhanced
+            
+            # Method 2: Mean adaptive threshold
+            thresh2 = cv2.adaptiveThreshold(
+                denoised, 255, cv2.ADAPTIVE_THRESH_MEAN_C, 
+                cv2.THRESH_BINARY, 11, 2
+            )
+            
+            # Combine both methods - take the brighter pixels (more text)
+            combined = cv2.max(thresh1, thresh2)
+            
+            # Morphological operations to connect broken text
+            kernel = np.ones((1,1), np.uint8)
+            dilated = cv2.dilate(combined, kernel, iterations=1)
+            eroded = cv2.erode(dilated, kernel, iterations=1)
+            
+            return eroded
         
         return image

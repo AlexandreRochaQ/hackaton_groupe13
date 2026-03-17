@@ -34,9 +34,9 @@ class DocumentPipeline:
         
         # Utiliser français si disponible, sinon anglais
         if fra_lang_file and fra_lang_file.exists():
-            self.ocr = OCR(lang='fra', config='--psm 6')
+            self.ocr = OCR(lang='fra', config='--psm 3')  # PSM 3: Fully automatic page segmentation
         else:
-            self.ocr = OCR(lang='eng', config='--psm 6')
+            self.ocr = OCR(lang='eng', config='--psm 3')
         
         self.detector = RegionDetector()
         self.extractor = LLMExtractor()
@@ -99,15 +99,24 @@ class DocumentPipeline:
         Returns:
             Dictionary with extracted data
         """
-        regions = self.detector.detect_regions(image)
-        cropped_regions = self.detector.extract_all_regions(image, regions)
+        # First, try full-text extraction (no region cropping)
+        ocr_text_full = self.ocr.extract_text(image)
         
-        ocr_results = self.ocr.extract_regions(cropped_regions)
-        
-        combined_text = "\n\n".join([
-            f"[{region_name.upper()}]\n{text}" 
-            for region_name, text in ocr_results.items()
-        ])
+        # Also try region-based extraction as supplementary
+        try:
+            regions = self.detector.detect_regions(image)
+            cropped_regions = self.detector.extract_all_regions(image, regions)
+            ocr_results = self.ocr.extract_regions(cropped_regions)
+            
+            # Combine full text with structured regions
+            combined_text = f"[FULL DOCUMENT]\n{ocr_text_full}\n\n"
+            combined_text += "\n\n".join([
+                f"[{region_name.upper()}]\n{text}" 
+                for region_name, text in ocr_results.items()
+            ])
+        except Exception as e:
+            print(f"Region detection failed, using full text only: {e}")
+            combined_text = ocr_text_full
         
         extracted_data = self.extractor.extract(combined_text)
         

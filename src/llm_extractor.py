@@ -7,7 +7,7 @@ import json
 import re
 from typing import Optional
 from langchain_groq import ChatGroq
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 from dotenv import load_dotenv
 
 
@@ -61,33 +61,44 @@ class LLMExtractor:
     
     def _get_prompt_template(self) -> str:
         """Return the prompt template for data extraction."""
-        return """Tu es un expert en extraction d'informations structurées à partir de documents administratifs (factures, devis, attestations, certificats).
+        return """Tu es un expert en extraction d'informations structurées à partir de documents administratifs français (factures, devis, attestations, certificats, documents scolaires).
 
-Analyse le texte OCR ci-dessous et extrais TOUTES les informations présentes. Retourne UNIQUEMENT un objet JSON valide.
+Analyse ATTENTIVEMENT le texte OCR ci-dessous et extrais TOUTES les informations présentes avec PRÉCISION. Le texte peut contenir des erreurs OCR, utilise ton jugement pour corriger.
 
 Structure JSON attendue:
-- document_type: facture|devis|attestation|certificat|autre
-- company_name: nom de l'entreprise/organisation ou chaîne vide
+- document_type: facture|devis|attestation|certificat|autre (précise le type exact si possible)
+- company_name: nom de l'établissement/entreprise/organisation ou chaîne vide
 - siren: numéro SIREN à 9 chiffres ou chaîne vide
-- siret: numéro SIRET à 14 chiffres ou chaîne vide
+- siret: numéro SIRET à 14 chiffres ou chaîne vide  
 - invoice_number: numéro de document ou chaîne vide
 - date: date au format ISO YYYY-MM-DD ou chaîne vide
 - amount: montant total numérique sans symbole monétaire ou chaîne vide
-- additional_info: objet contenant toutes les autres informations importantes trouvées
+- additional_info: objet contenant TOUTES les autres informations importantes trouvées
 
-Règles:
-- Si un champ ne peut pas être trouvé, utilise une chaîne vide ""
-- Pour les montants, extrais uniquement la valeur numérique (exemple: "1450" et non "1450€")
-- Pour les dates, convertis au format ISO YYYY-MM-DD
-- Sois précis avec SIREN (9 chiffres) et SIRET (14 chiffres)
-- Identifie le type de document depuis le contexte
-- Dans additional_info, ajoute TOUS les champs importants que tu trouves : adresses, contacts, noms, descriptions, conditions, etc.
-- Ne limite pas l'extraction aux champs prédéfinis - ajoute tout ce qui est pertinent
+Règles CRUCIALES:
+1. Si un champ ne peut pas être trouvé, utilise une chaîne vide ""
+2. Pour les montants, extrais uniquement la valeur numérique (exemple: "1450" et non "1450€")
+3. Pour les dates, convertis TOUJOURS au format ISO YYYY-MM-DD (ex: 19/10/2020 → 2020-10-19)
+4. Sois précis avec SIREN (9 chiffres) et SIRET (14 chiffres) - vérifie le nombre de chiffres
+5. Identifie le type de document depuis le contexte et les mots-clés
+6. Dans additional_info, ajoute TOUS les champs importants : 
+   - NOM COMPLET de la personne (corrige les erreurs OCR évidentes)
+   - DATE DE NAISSANCE complète (si partielle, reconstitue avec le contexte)
+   - ADRESSE COMPLÈTE (numéro, rue, code postal, ville)
+   - COORDONNÉES (téléphone, email, site web)
+   - ÉTABLISSEMENT SCOLAIRE / ENTREPRISE
+   - CODE NAF/APE
+   - NUMÉRO D'IMMATRICULATION
+   - TVA INTRACOMMUNAUTAIRE
+   - TOUTE AUTRE INFORMATION PERTINENTE
+7. CORRIGE les erreurs OCR évidentes (ex: "KAOUT/Æ" → "KAOUTAR", "KJ" → "85", etc.)
+8. COMPLÈTE les informations partielles en utilisant le contexte du document
+9. Ne limite pas l'extraction aux champs prédéfinis - ajoute tout ce qui est pertinent dans additional_info
 
 TEXTE OCR:
 {text}
 
-Retourne UNIQUEMENT l'objet JSON, aucun autre texte:"""
+Retourne UNIQUEMENT l'objet JSON valide, bien formaté, aucun autre texte:"""
     
     def extract(self, text: str) -> dict:
         """
@@ -106,7 +117,7 @@ Retourne UNIQUEMENT l'objet JSON, aucun autre texte:"""
             # Utiliser le mode JSON de Groq directement
             from langchain_core.prompts import ChatPromptTemplate
             chat_prompt = ChatPromptTemplate.from_messages([
-                ("system", "Tu es un assistant qui extrait des données structurées au format JSON."),
+                ("system", "Tu es un expert qui extrait des données structurées au format JSON à partir de documents administratifs français. Tu corriges les erreurs OCR et complètes les informations partielles."),
                 ("human", "{input}")
             ])
             

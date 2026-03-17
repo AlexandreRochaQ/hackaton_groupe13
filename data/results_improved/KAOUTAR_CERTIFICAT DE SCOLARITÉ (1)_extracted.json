@@ -1,0 +1,43 @@
+{
+  "document_info": {
+    "source_file": "KAOUTAR_CERTIFICAT DE SCOLARITÉ (1).pdf",
+    "pages_processed": 1
+  },
+  "extracted_data": [
+    {
+      "document_type": "certificat de scolarité",
+      "company_name": "Ecole IPSSI / IP-FORMATION",
+      "siren": "420793705",
+      "siret": "42079370500011",
+      "invoice_number": "",
+      "date": "2026-02-17",
+      "amount": "",
+      "additional_info": {
+        "nom_complet": "KAOUTAR Amine",
+        "date_de_naissance": "2002-10-19",
+        "adresse": {
+          "numéro": "",
+          "rue": "BOULEVARD MARCEL SEMBAT",
+          "code_postal": "69200",
+          "ville": "VENISSIEUX"
+        },
+        "coordonnées": {
+          "téléphone": "01.55.43.26.65",
+          "email": "",
+          "site_web": ""
+        },
+        "établissement_scolaire/entreprise": "Ecole IPSSI / IP-FORMATION",
+        "code_naf/ape": "8559A",
+        "numéro_d'immatriculation": "420793705",
+        "tva_intracommunautaire": "FR 41 420793705",
+        "autres_informations": {
+          "type_de_formation": "Initial",
+          "formation": "Mastère IA, Dev, Bigdata 4e, 5e année",
+          "date_de_formation": "2026-01-19 - 2026-10-30"
+        }
+      },
+      "page_number": 1,
+      "source_file": "KAOUTAR_CERTIFICAT DE SCOLARITÉ (1).pdf"
+    }
+  ]
+}
