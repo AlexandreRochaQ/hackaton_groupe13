@@ -50,38 +50,44 @@ class LLMExtractor:
                 "siret": {"type": "string"},
                 "invoice_number": {"type": "string"},
                 "date": {"type": "string"},
-                "amount": {"type": "string"}
+                "amount": {"type": "string"},
+                "additional_info": {
+                    "type": "object",
+                    "description": "Toutes les autres informations trouvées dans le document"
+                }
             },
             "required": ["document_type"]
         }
     
     def _get_prompt_template(self) -> str:
         """Return the prompt template for data extraction."""
-        return """You are an expert at extracting structured information from administrative documents (invoices, quotes, attestations).
+        return """Tu es un expert en extraction d'informations structurées à partir de documents administratifs (factures, devis, attestations, certificats).
 
-Analyze the following OCR-extracted text and extract the requested fields. Return ONLY a valid JSON object with the following structure:
+Analyse le texte OCR ci-dessous et extrais TOUTES les informations présentes. Retourne UNIQUEMENT un objet JSON valide.
 
-{{
-  "document_type": "invoice|quote|attestation",
-  "company_name": "extracted company name or empty string",
-  "siren": "9-digit SIREN number or empty string",
-  "siret": "14-digit SIRET number or empty string", 
-  "invoice_number": "document reference number or empty string",
-  "date": "date in YYYY-MM-DD format or empty string",
-  "amount": "total amount as number without currency symbol or empty string"
-}}
+Structure JSON attendue:
+- document_type: facture|devis|attestation|certificat|autre
+- company_name: nom de l'entreprise/organisation ou chaîne vide
+- siren: numéro SIREN à 9 chiffres ou chaîne vide
+- siret: numéro SIRET à 14 chiffres ou chaîne vide
+- invoice_number: numéro de document ou chaîne vide
+- date: date au format ISO YYYY-MM-DD ou chaîne vide
+- amount: montant total numérique sans symbole monétaire ou chaîne vide
+- additional_info: objet contenant toutes les autres informations importantes trouvées
 
-Rules:
-- If a field cannot be found, use an empty string ""
-- For amounts, extract only the numeric value (e.g., "1450" not "1450€")
-- For dates, convert to ISO format YYYY-MM-DD
-- Be precise with SIREN (9 digits) and SIRET (14 digits)
-- Identify document type from context (invoice = "Facture", quote = "Devis", attestation = "Attestation")
+Règles:
+- Si un champ ne peut pas être trouvé, utilise une chaîne vide ""
+- Pour les montants, extrais uniquement la valeur numérique (exemple: "1450" et non "1450€")
+- Pour les dates, convertis au format ISO YYYY-MM-DD
+- Sois précis avec SIREN (9 chiffres) et SIRET (14 chiffres)
+- Identifie le type de document depuis le contexte
+- Dans additional_info, ajoute TOUS les champs importants que tu trouves : adresses, contacts, noms, descriptions, conditions, etc.
+- Ne limite pas l'extraction aux champs prédéfinis - ajoute tout ce qui est pertinent
 
-OCR TEXT:
+TEXTE OCR:
 {text}
 
-Return ONLY the JSON object, no other text:"""
+Retourne UNIQUEMENT l'objet JSON, aucun autre texte:"""
     
     def extract(self, text: str) -> dict:
         """
@@ -94,9 +100,33 @@ Return ONLY the JSON object, no other text:"""
             Dictionary with extracted fields
         """
         try:
-            chain = self.llm | self._json_parser()
-            result = chain.invoke({"text": text})
-            return result
+            # Formater le prompt avec le texte
+            formatted_prompt = self.prompt_template.format(text=text)
+            
+            # Utiliser le mode JSON de Groq directement
+            from langchain_core.prompts import ChatPromptTemplate
+            chat_prompt = ChatPromptTemplate.from_messages([
+                ("system", "Tu es un assistant qui extrait des données structurées au format JSON."),
+                ("human", "{input}")
+            ])
+            
+            chain = chat_prompt | self.llm
+            response = chain.invoke({"input": formatted_prompt})
+            
+            # Parser la réponse JSON manuellement
+            import json
+            response_text = response.content if hasattr(response, 'content') else str(response)
+            
+            # Extraire le JSON de la réponse
+            start_idx = response_text.find('{')
+            end_idx = response_text.rfind('}') + 1
+            if start_idx >= 0 and end_idx > start_idx:
+                json_str = response_text[start_idx:end_idx]
+                result = json.loads(json_str)
+                return result
+            else:
+                raise ValueError("No JSON found in response")
+                
         except Exception as e:
             print(f"LLM extraction error: {e}")
             return self._fallback_extraction(text)
@@ -106,13 +136,14 @@ Return ONLY the JSON object, no other text:"""
         from langchain.output_parsers import ResponseSchema, StructuredOutputParser
         
         response_schemas = [
-            ResponseSchema(name="document_type", description="Type of document (invoice, quote, attestation)"),
-            ResponseSchema(name="company_name", description="Name of the company"),
-            ResponseSchema(name="siren", description="9-digit SIREN number"),
-            ResponseSchema(name="siret", description="14-digit SIRET number"),
-            ResponseSchema(name="invoice_number", description="Document reference number"),
-            ResponseSchema(name="date", description="Date in YYYY-MM-DD format"),
-            ResponseSchema(name="amount", description="Total amount as number")
+            ResponseSchema(name="document_type", description="Type of document (facture, devis, attestation, certificat)"),
+            ResponseSchema(name="company_name", description="Nom de l'entreprise/organisation"),
+            ResponseSchema(name="siren", description="Numéro SIREN à 9 chiffres"),
+            ResponseSchema(name="siret", description="Numéro SIRET à 14 chiffres"),
+            ResponseSchema(name="invoice_number", description="Numéro du document"),
+            ResponseSchema(name="date", description="Date au format YYYY-MM-DD"),
+            ResponseSchema(name="amount", description="Montant total numérique"),
+            ResponseSchema(name="additional_info", description="Toutes les autres informations importantes trouvées")
         ]
         
         parser = StructuredOutputParser.from_response_schemas(response_schemas)
@@ -135,7 +166,8 @@ Return ONLY the JSON object, no other text:"""
             "siret": "",
             "invoice_number": "",
             "date": "",
-            "amount": ""
+            "amount": "",
+            "additional_info": {}
         }
         
         siren_match = re.search(r'\b(\d{9})\b', text)

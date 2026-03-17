@@ -19,9 +19,25 @@ class DocumentPipeline:
     
     def __init__(self):
         """Initialize all pipeline components."""
-        # Use 'fra' for French documents if French language pack is installed in Tesseract
-        # Otherwise use 'eng' (English) which works by default
-        self.ocr = OCR(lang='eng', config='--psm 6')
+        # Configuration pour documents français (avec fallback anglais)
+        import os
+        from dotenv import load_dotenv
+        load_dotenv()
+        
+        # Vérifier si le pack français est installé
+        tesseract_path = os.getenv('TESSERACT_PATH')
+        fra_lang_file = None
+        if tesseract_path:
+            import pathlib
+            tessdata_dir = pathlib.Path(tesseract_path).parent / 'tessdata'
+            fra_lang_file = tessdata_dir / 'fra.traineddata'
+        
+        # Utiliser français si disponible, sinon anglais
+        if fra_lang_file and fra_lang_file.exists():
+            self.ocr = OCR(lang='fra', config='--psm 6')
+        else:
+            self.ocr = OCR(lang='eng', config='--psm 6')
+        
         self.detector = RegionDetector()
         self.extractor = LLMExtractor()
     
