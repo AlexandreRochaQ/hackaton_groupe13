@@ -1,13 +1,6 @@
 import { v4 as uuidv4 } from 'uuid'
 import { getMockExtraction, getMockValidation } from './mockData.js'
 
-/**
- * In-memory store simulating the async document processing pipeline.
- * Each batch transitions through steps automatically via setTimeout.
- *
- * Pipeline: uploaded → ocr_processing → extracting → validating → ready
- */
-
 const store = new Map()
 
 const PIPELINE = ['uploaded', 'ocr_processing', 'extracting', 'validating', 'ready']

@@ -22,9 +22,7 @@ function AutoFilledInput({ label, value, onChange, autoFilled }) {
         value={value}
         onChange={e => onChange(e.target.value)}
         className={`w-full px-3 py-2.5 rounded-lg border text-sm text-slate-900 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400 ${
-          autoFilled
-            ? 'border-blue-200 bg-blue-50/40 focus:bg-white'
-            : 'border-slate-200 bg-white'
+          autoFilled ? 'border-blue-200 bg-blue-50/40 focus:bg-white' : 'border-slate-200 bg-white'
         }`}
       />
     </div>
@@ -76,7 +74,6 @@ export default function CRMPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-8">
-      {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <button onClick={() => navigate(`/review/${batchId}`)} className="text-slate-400 hover:text-slate-700 transition-colors">
           <ArrowLeft size={18} />
@@ -102,7 +99,6 @@ export default function CRMPage() {
 
       {form && (
         <div className="space-y-6">
-          {/* Company info */}
           <div className="bg-white border border-slate-200 rounded-xl p-5">
             <SectionTitle>Informations société</SectionTitle>
             <div className="space-y-4">
@@ -110,79 +106,32 @@ export default function CRMPage() {
                 label="Raison sociale"
                 value={form.raisonSociale}
                 onChange={v => setField('raisonSociale', v)}
-                autoFilled={form._autoFilledFields?.includes('raisonSociale') || !!data?.raisonSociale}
+                autoFilled={!!data?.raisonSociale}
               />
               <div className="grid grid-cols-2 gap-4">
-                <AutoFilledInput
-                  label="SIRET"
-                  value={form.siret}
-                  onChange={v => setField('siret', v)}
-                  autoFilled={!!data?.siret}
-                />
-                <AutoFilledInput
-                  label="N° TVA"
-                  value={form.tva}
-                  onChange={v => setField('tva', v)}
-                  autoFilled={!!data?.tva}
-                />
+                <AutoFilledInput label="SIRET" value={form.siret} onChange={v => setField('siret', v)} autoFilled={!!data?.siret} />
+                <AutoFilledInput label="N° TVA" value={form.tva} onChange={v => setField('tva', v)} autoFilled={!!data?.tva} />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <AutoFilledInput
-                  label="Forme juridique"
-                  value={form.formeJuridique}
-                  onChange={v => setField('formeJuridique', v)}
-                  autoFilled={!!data?.formeJuridique}
-                />
-                <AutoFilledInput
-                  label="Capital social"
-                  value={form.capital}
-                  onChange={v => setField('capital', v)}
-                  autoFilled={!!data?.capital}
-                />
+                <AutoFilledInput label="Forme juridique" value={form.formeJuridique} onChange={v => setField('formeJuridique', v)} autoFilled={!!data?.formeJuridique} />
+                <AutoFilledInput label="Capital social" value={form.capital} onChange={v => setField('capital', v)} autoFilled={!!data?.capital} />
               </div>
-              <AutoFilledInput
-                label="Adresse du siège social"
-                value={form.adresse}
-                onChange={v => setField('adresse', v)}
-                autoFilled={!!data?.adresse}
-              />
-              <AutoFilledInput
-                label="Activité principale"
-                value={form.activite}
-                onChange={v => setField('activite', v)}
-                autoFilled={!!data?.activite}
-              />
+              <AutoFilledInput label="Adresse du siège social" value={form.adresse} onChange={v => setField('adresse', v)} autoFilled={!!data?.adresse} />
+              <AutoFilledInput label="Activité principale" value={form.activite} onChange={v => setField('activite', v)} autoFilled={!!data?.activite} />
             </div>
           </div>
 
-          {/* Bank info */}
           <div className="bg-white border border-slate-200 rounded-xl p-5">
             <SectionTitle>Coordonnées bancaires</SectionTitle>
             <div className="space-y-4">
-              <AutoFilledInput
-                label="IBAN"
-                value={form.iban}
-                onChange={v => setField('iban', v)}
-                autoFilled={!!data?.iban}
-              />
+              <AutoFilledInput label="IBAN" value={form.iban} onChange={v => setField('iban', v)} autoFilled={!!data?.iban} />
               <div className="grid grid-cols-2 gap-4">
-                <AutoFilledInput
-                  label="BIC / SWIFT"
-                  value={form.bic}
-                  onChange={v => setField('bic', v)}
-                  autoFilled={!!data?.bic}
-                />
-                <AutoFilledInput
-                  label="Banque"
-                  value={form.banque}
-                  onChange={v => setField('banque', v)}
-                  autoFilled={!!data?.banque}
-                />
+                <AutoFilledInput label="BIC / SWIFT" value={form.bic} onChange={v => setField('bic', v)} autoFilled={!!data?.bic} />
+                <AutoFilledInput label="Banque" value={form.banque} onChange={v => setField('banque', v)} autoFilled={!!data?.banque} />
               </div>
             </div>
           </div>
 
-          {/* Source documents */}
           {data?._sourceDocuments?.length > 0 && (
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs text-slate-400">Sources :</span>
@@ -192,23 +141,12 @@ export default function CRMPage() {
             </div>
           )}
 
-          {/* Save */}
           <button
             onClick={() => mutation.mutate(form)}
             disabled={mutation.isPending}
             className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-xl text-sm transition-colors"
           >
-            {saved ? (
-              <>
-                <CheckCircle2 size={16} />
-                Enregistré dans le CRM
-              </>
-            ) : (
-              <>
-                <Save size={16} />
-                {mutation.isPending ? 'Enregistrement…' : 'Enregistrer dans le CRM'}
-              </>
-            )}
+            {saved ? <><CheckCircle2 size={16} />Enregistré dans le CRM</> : <><Save size={16} />{mutation.isPending ? 'Enregistrement…' : 'Enregistrer dans le CRM'}</>}
           </button>
         </div>
       )}

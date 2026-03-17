@@ -7,7 +7,7 @@ import { uploadDocuments } from '../../api/documents.js'
 
 export default function UploadPage() {
   const [files, setFiles] = useState([])
-  const [fileStatuses, setFileStatuses] = useState({}) // filename -> status
+  const [fileStatuses, setFileStatuses] = useState({})
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState(null)
   const navigate = useNavigate()
@@ -40,27 +40,24 @@ export default function UploadPage() {
     setUploading(true)
     setError(null)
 
-    // Mark all as uploading
-    const uploading = {}
-    files.forEach(f => { uploading[f.name] = 'uploading' })
-    setFileStatuses(uploading)
+    const pending = {}
+    files.forEach(f => { pending[f.name] = 'uploading' })
+    setFileStatuses(pending)
 
     try {
       const result = await uploadDocuments(files)
 
-      // Mark all as done
       const done = {}
       files.forEach(f => { done[f.name] = 'done' })
       setFileStatuses(done)
 
-      // Short pause to show green checkmarks before redirect
       await new Promise(r => setTimeout(r, 800))
       localStorage.setItem('lastBatchId', result.batchId)
       navigate(`/review/${result.batchId}`)
     } catch (err) {
-      const errorStatuses = {}
-      files.forEach(f => { errorStatuses[f.name] = 'error' })
-      setFileStatuses(errorStatuses)
+      const failed = {}
+      files.forEach(f => { failed[f.name] = 'error' })
+      setFileStatuses(failed)
       setError(err.message)
       setUploading(false)
     }
@@ -68,7 +65,6 @@ export default function UploadPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-10">
-      {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-900">Upload de documents</h1>
         <p className="text-slate-500 mt-1 text-sm">
@@ -76,10 +72,8 @@ export default function UploadPage() {
         </p>
       </div>
 
-      {/* Dropzone */}
       <DropZone onFilesAdded={handleFilesAdded} disabled={uploading} />
 
-      {/* File list */}
       {files.length > 0 && (
         <div className="mt-6 space-y-2">
           <div className="flex items-center justify-between mb-3">
@@ -108,14 +102,12 @@ export default function UploadPage() {
         </div>
       )}
 
-      {/* Error */}
       {error && (
         <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
           <p className="text-sm text-red-700">{error}</p>
         </div>
       )}
 
-      {/* Upload CTA */}
       {files.length > 0 && (
         <div className="mt-6">
           <button
@@ -132,7 +124,6 @@ export default function UploadPage() {
         </div>
       )}
 
-      {/* Empty state hint */}
       {files.length === 0 && (
         <div className="mt-8 grid grid-cols-3 gap-3">
           {['Factures fournisseurs', 'Attestations URSSAF', 'Extraits Kbis'].map(label => (

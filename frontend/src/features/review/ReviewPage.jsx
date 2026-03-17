@@ -18,18 +18,20 @@ const PIPELINE_STEPS = [
   { key: 'ready', label: 'Prêt' },
 ]
 
-function stepIndex(step) {
-  return PIPELINE_STEPS.findIndex(s => s.key === step)
+const STEP_LABELS = {
+  uploaded: 'Documents reçus, démarrage du pipeline',
+  ocr_processing: 'Lecture OCR des documents',
+  extracting: 'Extraction des entités par NLP',
+  validating: 'Vérification de cohérence inter-documents',
 }
 
 function PipelineProgress({ currentStep }) {
-  const current = stepIndex(currentStep)
+  const current = PIPELINE_STEPS.findIndex(s => s.key === currentStep)
   return (
-    <div className="flex items-center gap-0">
+    <div className="flex items-center">
       {PIPELINE_STEPS.map((step, i) => {
         const done = i < current
         const active = i === current
-        const pending = i > current
         return (
           <div key={step.key} className="flex items-center">
             <div className="flex flex-col items-center gap-1">
@@ -38,7 +40,7 @@ function PipelineProgress({ currentStep }) {
               }`}>
                 {done && <CheckCircle2 size={14} className="text-white" />}
                 {active && <Loader2 size={13} className="text-white animate-spin" />}
-                {pending && <Circle size={12} className="text-slate-400" />}
+                {!done && !active && <Circle size={12} className="text-slate-400" />}
               </div>
               <span className={`text-xs font-medium whitespace-nowrap ${
                 done ? 'text-green-600' : active ? 'text-blue-600' : 'text-slate-400'
@@ -61,7 +63,6 @@ export default function ReviewPage() {
   const navigate = useNavigate()
   const [selectedDocId, setSelectedDocId] = useState(null)
 
-  // Poll status until ready
   const { data: statusData } = useQuery({
     queryKey: ['batch-status', batchId],
     queryFn: () => getBatchStatus(batchId),
@@ -73,7 +74,6 @@ export default function ReviewPage() {
   const pipelineStep = statusData?.pipelineStep || 'uploaded'
   const documents = statusData?.documents || []
 
-  // Fetch extraction + validation only when ready
   const { data: extraction } = useQuery({
     queryKey: ['extraction', batchId],
     queryFn: () => getExtraction(batchId),
@@ -86,15 +86,12 @@ export default function ReviewPage() {
     enabled: !!batchId && isReady,
   })
 
-  // Auto-select first document when ready
   const selectedId = selectedDocId || documents[0]?.id
   const selectedExtraction = extraction?.find(e => e.documentId === selectedId)
-
   const critiques = validation?.summary?.critiques || 0
 
   return (
     <div className="flex flex-col h-screen">
-      {/* Top bar */}
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
         <div>
           <h1 className="text-lg font-bold text-slate-900">Révision & extraction</h1>
@@ -113,9 +110,7 @@ export default function ReviewPage() {
             <button
               onClick={() => navigate(`/compliance/${batchId}`)}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                critiques > 0
-                  ? 'bg-red-600 hover:bg-red-700 text-white'
-                  : 'bg-green-600 hover:bg-green-700 text-white'
+                critiques > 0 ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'
               }`}
             >
               {critiques > 0 ? <AlertTriangle size={14} /> : <ShieldCheck size={14} />}
@@ -125,9 +120,7 @@ export default function ReviewPage() {
         )}
       </div>
 
-      {/* Body */}
       <div className="flex flex-1 min-h-0">
-        {/* Left — document list */}
         <div className="w-72 flex-shrink-0 border-r border-slate-200 bg-slate-50 overflow-y-auto p-3 space-y-2">
           <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider px-1 mb-3">
             Documents ({documents.length})
@@ -149,35 +142,24 @@ export default function ReviewPage() {
           ))}
         </div>
 
-        {/* Right — extraction + inconsistencies */}
         <div className="flex-1 flex flex-col min-h-0 bg-white">
           {!isReady ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-4 text-slate-400">
               <Loader2 size={32} className="animate-spin text-blue-400" />
               <div className="text-center">
                 <p className="text-base font-medium text-slate-600">Traitement en cours…</p>
-                <p className="text-sm mt-1">
-                  {pipelineStep === 'ocr_processing' && "Lecture OCR des documents"}
-                  {pipelineStep === 'extracting' && "Extraction des entités par NLP"}
-                  {pipelineStep === 'validating' && "Vérification de cohérence inter-documents"}
-                  {pipelineStep === 'uploaded' && "Documents reçus, démarrage du pipeline"}
-                </p>
+                <p className="text-sm mt-1">{STEP_LABELS[pipelineStep]}</p>
               </div>
             </div>
           ) : (
             <>
-              {/* Extracted fields — scrollable */}
               <div className="flex-1 min-h-0 overflow-y-auto">
                 {!extraction ? (
-                  <div className="p-5 space-y-3">
-                    <SkeletonCard lines={6} />
-                  </div>
+                  <div className="p-5"><SkeletonCard lines={6} /></div>
                 ) : (
                   <ExtractedFields extraction={selectedExtraction} />
                 )}
               </div>
-
-              {/* Inconsistency panel — fixed at bottom */}
               <InconsistencyPanel validation={validation} />
             </>
           )}

@@ -1,10 +1,3 @@
-/**
- * Realistic mock extraction data for demo purposes.
- * Scenario: supplier "TECH SOLUTIONS SAS" with 2 intentional inconsistencies:
- *   1. SIRET mismatch between invoice and URSSAF attestation
- *   2. URSSAF attestation expired
- */
-
 function detectType(filename) {
   const f = filename.toLowerCase()
   if (f.includes('facture') || f.includes('invoice')) return 'facture'
@@ -77,11 +70,9 @@ const EXTRACTION_TEMPLATES = {
     typeLabel: TYPE_LABELS.urssaf,
     confidence: 0.96,
     fields: {
-      // Intentional SIRET mismatch for demo
       siret: { value: '87654321098765', label: 'SIRET', confidence: 0.97 },
       raisonSociale: { value: 'TECH SOLUTIONS SAS', label: 'Raison sociale', confidence: 0.98 },
       dateEmission: { value: '01/10/2025', label: "Date d'émission", confidence: 0.97 },
-      // Intentional expired date for demo
       dateExpiration: { value: '31/12/2025', label: "Date d'expiration", confidence: 0.98 },
       statut: { value: 'En règle au jour de délivrance', label: 'Statut', confidence: 0.96 },
       organisme: { value: 'URSSAF Île-de-France', label: 'Organisme émetteur', confidence: 0.97 },
@@ -123,24 +114,15 @@ export function getMockExtraction(documents) {
   return documents.map(doc => {
     const type = detectType(doc.name)
     const template = EXTRACTION_TEMPLATES[type] || EXTRACTION_TEMPLATES.inconnu
-    return {
-      documentId: doc.id,
-      documentName: doc.name,
-      ...template,
-    }
+    return { documentId: doc.id, documentName: doc.name, ...template }
   })
 }
 
 export function getMockValidation(documents) {
   const types = documents.map(d => detectType(d.name))
-
   const inconsistencies = []
 
-  const hasFacture = types.includes('facture')
-  const hasUrssaf = types.includes('urssaf')
-  const hasKbis = types.includes('kbis')
-
-  if (hasFacture && hasUrssaf) {
+  if (types.includes('facture') && types.includes('urssaf')) {
     inconsistencies.push({
       id: 'inc-001',
       severity: 'critique',
@@ -156,12 +138,12 @@ export function getMockValidation(documents) {
     })
   }
 
-  if (hasUrssaf) {
+  if (types.includes('urssaf')) {
     inconsistencies.push({
       id: 'inc-002',
       severity: 'critique',
       code: 'ATTESTATION_EXPIRÉE',
-      title: "Attestation URSSAF expirée",
+      title: 'Attestation URSSAF expirée',
       description:
         "L'attestation de vigilance URSSAF a expiré le 31/12/2025. Elle n'est plus valide à la date de traitement (10/02/2026). Un renouvellement est obligatoire avant tout règlement.",
       affectedDocuments: ['Attestation de vigilance URSSAF'],
@@ -173,14 +155,13 @@ export function getMockValidation(documents) {
     })
   }
 
-  if (hasFacture && hasKbis) {
-    // No inconsistency — matching SIRET (positive validation)
+  if (types.includes('facture') && types.includes('kbis')) {
     inconsistencies.push({
       id: 'val-001',
       severity: 'ok',
       code: 'SIRET_VALIDATED',
-      title: 'SIRET cohérent — Facture / Kbis',
-      description: 'Le SIRET (52384756900123) est identique sur la facture et l\'extrait Kbis.',
+      title: "SIRET cohérent — Facture / Kbis",
+      description: "Le SIRET (52384756900123) est identique sur la facture et l'extrait Kbis.",
       affectedDocuments: ['Facture fournisseur', 'Extrait Kbis'],
       values: {
         'Facture fournisseur': '52384756900123',

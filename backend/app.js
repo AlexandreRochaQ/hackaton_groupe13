@@ -21,7 +21,6 @@ app.use('/api/validation', validationRouter)
 app.use('/api/crm', crmRouter)
 app.use('/api/compliance', complianceRouter)
 
-// Silence Chrome DevTools auto-probe (harmless 404 suppression)
 app.get('/.well-known/*', (_req, res) => res.status(204).end())
 
 app.get('/health', (_req, res) => {

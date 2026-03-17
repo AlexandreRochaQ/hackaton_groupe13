@@ -1,9 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useState } from 'react'
-import {
-  ArrowLeft, CheckCircle2, XCircle, MinusCircle, ShieldCheck, ShieldX, Save, Cpu
-} from 'lucide-react'
+import { ArrowLeft, CheckCircle2, XCircle, MinusCircle, ShieldCheck, ShieldX, Save, Cpu } from 'lucide-react'
 import { getComplianceData, saveComplianceDecision } from '../../api/compliance.js'
 import SkeletonCard from '../../components/SkeletonCard.jsx'
 
@@ -77,7 +75,6 @@ export default function CompliancePage() {
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-8">
-      {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <button onClick={() => navigate(`/review/${batchId}`)} className="text-slate-400 hover:text-slate-700 transition-colors">
           <ArrowLeft size={18} />
@@ -104,17 +101,11 @@ export default function CompliancePage() {
 
       {data && (
         <div className="space-y-4">
-          {/* Global status banner */}
-          <div className={`flex items-center gap-4 p-4 rounded-xl border-2 ${
-            isCompliant
-              ? 'bg-green-50 border-green-300'
-              : 'bg-red-50 border-red-300'
-          }`}>
-            {isCompliant ? (
-              <ShieldCheck size={28} className="text-green-600 flex-shrink-0" />
-            ) : (
-              <ShieldX size={28} className="text-red-600 flex-shrink-0" />
-            )}
+          <div className={`flex items-center gap-4 p-4 rounded-xl border-2 ${isCompliant ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'}`}>
+            {isCompliant
+              ? <ShieldCheck size={28} className="text-green-600 flex-shrink-0" />
+              : <ShieldX size={28} className="text-red-600 flex-shrink-0" />
+            }
             <div>
               <p className={`font-bold text-base ${isCompliant ? 'text-green-800' : 'text-red-800'}`}>
                 {isCompliant ? 'Dossier conforme' : 'Dossier non conforme'}
@@ -129,7 +120,6 @@ export default function CompliancePage() {
             </span>
           </div>
 
-          {/* Checks */}
           <div className="space-y-3">
             {data.checks.urssaf && (
               <CheckRow
@@ -159,7 +149,6 @@ export default function CompliancePage() {
             )}
           </div>
 
-          {/* Decision */}
           <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-4">
             <h3 className="text-sm font-bold text-slate-700">Décision du responsable conformité</h3>
 
@@ -170,10 +159,8 @@ export default function CompliancePage() {
                   onClick={() => setDecision(d)}
                   className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
                     decision === d
-                      ? d === 'valider'
-                        ? 'bg-green-600 border-green-600 text-white'
-                        : d === 'rejeter'
-                        ? 'bg-red-600 border-red-600 text-white'
+                      ? d === 'valider' ? 'bg-green-600 border-green-600 text-white'
+                        : d === 'rejeter' ? 'bg-red-600 border-red-600 text-white'
                         : 'bg-amber-500 border-amber-500 text-white'
                       : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
                   }`}
@@ -201,17 +188,10 @@ export default function CompliancePage() {
               disabled={!decision || mutation.isPending}
               className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:text-slate-400 text-white font-semibold rounded-xl text-sm transition-colors"
             >
-              {saved ? (
-                <>
-                  <CheckCircle2 size={16} />
-                  Décision enregistrée
-                </>
-              ) : (
-                <>
-                  <Save size={16} />
-                  {mutation.isPending ? 'Enregistrement…' : 'Enregistrer la décision'}
-                </>
-              )}
+              {saved
+                ? <><CheckCircle2 size={16} />Décision enregistrée</>
+                : <><Save size={16} />{mutation.isPending ? 'Enregistrement…' : 'Enregistrer la décision'}</>
+              }
             </button>
           </div>
         </div>
