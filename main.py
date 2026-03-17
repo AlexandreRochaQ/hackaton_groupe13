@@ -12,6 +12,12 @@ import argparse
 import sys
 from pathlib import Path
 
+# Ensure the OCR service package is importable when running from the repo root
+ROOT_DIR = Path(__file__).resolve().parent
+OCR_SERVICE_DIR = ROOT_DIR / "ocr-service"
+if str(OCR_SERVICE_DIR) not in sys.path:
+    sys.path.insert(0, str(OCR_SERVICE_DIR))
+
 from src.pipeline import DocumentPipeline
 
 
@@ -20,11 +26,13 @@ def parse_arguments():
     parser = argparse.ArgumentParser(
         description="Document AI Pipeline - Extract structured data from PDFs",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
+        epilog=r"""
 Examples:
+  python ../main.py -i ../data/documents -o ../data/results
   python main.py --input data/documents --output data/results
   python main.py -i invoice.pdf -o results/
-  python main.py --input ./pdfs --output ./output --verbose
+  python main.py --input ./pdfs --output ./output --verbose --model qwen2.5
+  python main.py --input ./pdfs --output ./output --verbose --model llama3.1
         """
     )
     
@@ -46,6 +54,13 @@ Examples:
         '-v', '--verbose',
         action='store_true',
         help='Enable verbose output'
+    )
+    
+    parser.add_argument(
+        '--model',
+        type=str,
+        default='llama3.1',
+        help='LLM model to use for extraction (e.g., llama3.1, qwen2.5)'
     )
     
     return parser.parse_args()
@@ -93,7 +108,7 @@ def main():
     print(f"Output: {args.output}")
     print("=" * 60)
     
-    pipeline = DocumentPipeline()
+    pipeline = DocumentPipeline(llm_model=args.model)
     
     try:
         summary = pipeline.run(args.input, args.output)

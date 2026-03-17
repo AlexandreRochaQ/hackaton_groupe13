@@ -17,7 +17,7 @@ from .llm_extractor import LLMExtractor
 class DocumentPipeline:
     """Orchestrates the complete document processing workflow."""
     
-    def __init__(self):
+    def __init__(self, llm_model: str = "llama3.1"):
         """Initialize all pipeline components."""
         # Configuration pour documents français (avec fallback anglais)
         import os
@@ -39,7 +39,7 @@ class DocumentPipeline:
             self.ocr = OCR(lang='eng', config='--psm 3')
         
         self.detector = RegionDetector()
-        self.extractor = LLMExtractor()
+        self.extractor = LLMExtractor(model_name=llm_model)
     
     def load_document(self, file_path: str) -> str:
         """

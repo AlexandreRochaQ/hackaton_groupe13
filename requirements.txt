@@ -7,10 +7,8 @@ opencv-python==4.9.0.80
 # YOLO for document detection (optional/future use)
 ultralytics==8.1.0
 
-# LangChain and LLM integration
-langchain==0.1.16
-langchain-groq==0.1.3
-langchain-community==0.0.32
+# HTTP requests for Ollama API
+requests==2.31.0
 
 # Environment and utilities
 python-dotenv==1.0.1
