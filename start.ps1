@@ -64,10 +64,24 @@ Write-Host "OK  Python dependencies ready" -ForegroundColor Green
 
 # ── Optional: warn about Tesseract ──────────────────────────────────────────
 
-if (-not (Get-Command tesseract -ErrorAction SilentlyContinue)) {
+# Check Tesseract via PATH or TESSERACT_PATH in .env
+$tesseractFound = Get-Command tesseract -ErrorAction SilentlyContinue
+if (-not $tesseractFound) {
+    $envFile = "$ROOT\.env"
+    if (Test-Path $envFile) {
+        $tesseractLine = Get-Content $envFile | Where-Object { $_ -match '^TESSERACT_PATH=' }
+        if ($tesseractLine) {
+            $tesseractExe = $tesseractLine -replace '^TESSERACT_PATH=', ''
+            if (Test-Path $tesseractExe) { $tesseractFound = $true }
+        }
+    }
+}
+if (-not $tesseractFound) {
     Write-Host ""
-    Write-Host "WARN: Tesseract not found - OCR will use stub responses." -ForegroundColor Yellow
-    Write-Host "      Install requirements-ocr.txt and set TESSERACT_PATH in .env when ready."
+    Write-Host "WARN: Tesseract not found - OCR may not work." -ForegroundColor Yellow
+    Write-Host "      Set TESSERACT_PATH in .env to the tesseract.exe location."
+} else {
+    Write-Host "OK  Tesseract found" -ForegroundColor Green
 }
 
 # ── Start all services ──────────────────────────────────────────────────────
