@@ -5,10 +5,15 @@ LLM-based structured data extraction using LangChain and Groq.
 import os
 import json
 import re
+import logging
 from typing import Optional
 from langchain_groq import ChatGroq
 from langchain_core.prompts import PromptTemplate
 from dotenv import load_dotenv
+from .config import Config
+from .validators import validate_siren, validate_siret, validate_date_format
+
+logger = logging.getLogger(__name__)
 
 
 load_dotenv()
@@ -24,16 +29,18 @@ class LLMExtractor:
         Args:
             model_name: Groq model to use for extraction
         """
-        api_key = os.getenv("GROQ_API_KEY")
+        api_key = Config.GROQ_API_KEY
         if not api_key:
             raise ValueError(
                 "GROQ_API_KEY not found. Please set it in your .env file."
             )
         
+        logger.info(f"Initializing LLM with model: {model_name}")
+        
         self.llm = ChatGroq(
             groq_api_key=api_key,
-            model_name=model_name,
-            temperature=0.1
+            model_name=model_name or Config.GROQ_MODEL,
+            temperature=Config.GROQ_TEMPERATURE
         )
         
         self.prompt_template = PromptTemplate(
@@ -61,39 +68,44 @@ class LLMExtractor:
     
     def _get_prompt_template(self) -> str:
         """Return the prompt template for data extraction."""
-        return """Tu es un expert en extraction d'informations structurées à partir de documents administratifs français (factures, devis, attestations, certificats, documents scolaires).
+        return """Tu es un expert en extraction d'informations structurées à partir de documents (factures, devis, attestations, certificats, documents commerciaux).
 
 Analyse ATTENTIVEMENT le texte OCR ci-dessous et extrais TOUTES les informations présentes avec PRÉCISION. Le texte peut contenir des erreurs OCR, utilise ton jugement pour corriger.
 
 Structure JSON attendue:
-- document_type: facture|devis|attestation|certificat|autre (précise le type exact si possible)
-- company_name: nom de l'établissement/entreprise/organisation ou chaîne vide
+- document_type: facture|devis|attestation|certificat|invoice|quote|autre (en anglais ou français)
+- company_name: nom de l'émetteur (entreprise, organisation, émetteur de la facture) ou chaîne vide
 - siren: numéro SIREN à 9 chiffres ou chaîne vide
 - siret: numéro SIRET à 14 chiffres ou chaîne vide  
-- invoice_number: numéro de document ou chaîne vide
-- date: date au format ISO YYYY-MM-DD ou chaîne vide
-- amount: montant total numérique sans symbole monétaire ou chaîne vide
+- invoice_number: numéro de facture/document ou chaîne vide
+- date: date du document au format ISO YYYY-MM-DD ou chaîne vide
+- amount: montant total TTC numérique sans symbole monétaire ou chaîne vide
 - additional_info: objet contenant TOUTES les autres informations importantes trouvées
 
 Règles CRUCIALES:
 1. Si un champ ne peut pas être trouvé, utilise une chaîne vide ""
-2. Pour les montants, extrais uniquement la valeur numérique (exemple: "1450" et non "1450€")
-3. Pour les dates, convertis TOUJOURS au format ISO YYYY-MM-DD (ex: 19/10/2020 → 2020-10-19)
+2. Pour les montants, extrais uniquement la valeur numérique (exemple: "5263" et non "5263€")
+3. Pour les dates, convertis TOUJOURS au format ISO YYYY-MM-DD (ex: 17/03/2026 → 2026-03-17)
 4. Sois précis avec SIREN (9 chiffres) et SIRET (14 chiffres) - vérifie le nombre de chiffres
-5. Identifie le type de document depuis le contexte et les mots-clés
-6. Dans additional_info, ajoute TOUS les champs importants : 
-   - NOM COMPLET de la personne (corrige les erreurs OCR évidentes)
-   - DATE DE NAISSANCE complète (si partielle, reconstitue avec le contexte)
-   - ADRESSE COMPLÈTE (numéro, rue, code postal, ville)
-   - COORDONNÉES (téléphone, email, site web)
-   - ÉTABLISSEMENT SCOLAIRE / ENTREPRISE
-   - CODE NAF/APE
-   - NUMÉRO D'IMMATRICULATION
-   - TVA INTRACOMMUNAUTAIRE
-   - TOUTE AUTRE INFORMATION PERTINENTE
-7. CORRIGE les erreurs OCR évidentes (ex: "KAOUT/Æ" → "KAOUTAR", "KJ" → "85", etc.)
-8. COMPLÈTE les informations partielles en utilisant le contexte du document
-9. Ne limite pas l'extraction aux champs prédéfinis - ajoute tout ce qui est pertinent dans additional_info
+5. Identifie le type de document depuis le contexte
+6. Dans additional_info, ajoute TOUS les champs importants que tu trouves :
+   - ÉMETTEUR/COMPAGNIE: Qui émet le document
+   - CLIENT/FACTURÉ À: Qui reçoit la facture
+   - ADRESSES: Complètes (numéro, rue, code postal, ville)
+   - CONTACTS: Téléphone, email, site web
+   - MONTANTS: Total HT, TVA, Total TTC, descriptions des articles
+   - PAIEMENT: Conditions, RIB/IBAN, échéance
+   - AUTRES: Codes NAF/APE, immatriculations, références
+7. CORRIGE les erreurs OCR évidentes
+8. COMPLÈTE les informations partielles en utilisant le contexte
+9. Ne limite PAS l'extraction - ajoute TOUT ce qui est pertinent dans additional_info
+10. Pour les FACTURES COMMERCIALES, extrais:
+    - L'émetteur (company_name)
+    - Le client (dans additional_info.nom_complet ou additional_info.client)
+    - Les deux adresses
+    - Tous les montants (HT, TVA, TTC)
+    - Les conditions de paiement
+    - Le RIB/IBAN
 
 TEXTE OCR:
 {text}
@@ -109,8 +121,13 @@ Retourne UNIQUEMENT l'objet JSON valide, bien formaté, aucun autre texte:"""
             
         Returns:
             Dictionary with extracted fields
+            
+        Raises:
+            ExtractionError: If extraction fails
         """
         try:
+            logger.info(f"Extracting data from {len(text)} characters of OCR text")
+            
             # Formater le prompt avec le texte
             formatted_prompt = self.prompt_template.format(text=text)
             
@@ -125,7 +142,6 @@ Retourne UNIQUEMENT l'objet JSON valide, bien formaté, aucun autre texte:"""
             response = chain.invoke({"input": formatted_prompt})
             
             # Parser la réponse JSON manuellement
-            import json
             response_text = response.content if hasattr(response, 'content') else str(response)
             
             # Extraire le JSON de la réponse
@@ -134,13 +150,45 @@ Retourne UNIQUEMENT l'objet JSON valide, bien formaté, aucun autre texte:"""
             if start_idx >= 0 and end_idx > start_idx:
                 json_str = response_text[start_idx:end_idx]
                 result = json.loads(json_str)
+                
+                # Validate and enrich extracted data
+                self._validate_and_enrich(result)
+                
+                logger.info(f"Data extraction successful: {result.get('document_type', 'unknown')}")
                 return result
             else:
+                logger.error("No JSON found in LLM response")
                 raise ValueError("No JSON found in response")
                 
         except Exception as e:
-            print(f"LLM extraction error: {e}")
+            logger.error(f"LLM extraction error: {e}")
             return self._fallback_extraction(text)
+    
+    def _validate_and_enrich(self, data: dict) -> None:
+        """
+        Validate and enrich extracted data.
+        
+        Args:
+            data: Extracted data dictionary
+        """
+        logger.debug("Validating extracted data...")
+        
+        # Validate SIREN if present
+        if data.get('siren'):
+            if not validate_siren(data['siren']):
+                logger.warning(f"Invalid SIREN format: {data['siren']}")
+        
+        # Validate SIRET if present
+        if data.get('siret'):
+            if not validate_siret(data['siret']):
+                logger.warning(f"Invalid SIRET format: {data['siret']}")
+        
+        # Validate date format if present
+        if data.get('date'):
+            if not validate_date_format(data['date']):
+                logger.warning(f"Invalid date format: {data['date']}")
+        
+        logger.debug("Validation complete")
     
     def _json_parser(self):
         """Parse LLM response as JSON."""

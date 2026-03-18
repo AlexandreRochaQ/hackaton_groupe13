@@ -1,0 +1,69 @@
+{
+  "document_info": {
+    "source_file": "doc_0.pdf",
+    "pages_processed": 1
+  },
+  "extracted_data": [
+    {
+      "document_type": "facture",
+      "company_name": "Dupuy Teixeira SA",
+      "siren": "",
+      "siret": "00686175188748",
+      "invoice_number": "FA-1758-2026",
+      "date": "2026-03-17",
+      "amount": "5263",
+      "additional_info": {
+        "emetteur": "Dupuy Teixeira SA",
+        "client": "Jeanne Petit",
+        "adresses": {
+          "emetteur": {
+            "adresse": "116, chemin Hoarau, 66556 Leconte"
+          },
+          "client": {
+            "adresse": "99, rue Hardy, 70518 David"
+          }
+        },
+        "contacts": {
+          "emetteur": "",
+          "client": ""
+        },
+        "montants": {
+          "total_ht": "4386",
+          "tva": "877",
+          "total_ttc": "5263",
+          "articles": [
+            {
+              "description": "Incubate sticky e-services",
+              "quantite": "7",
+              "pu_ht": "232",
+              "total_ht": "1624"
+            },
+            {
+              "description": "Brand scalable infrastructures",
+              "quantite": "2",
+              "pu_ht": "433",
+              "total_ht": "866"
+            },
+            {
+              "description": "Leverage rich initiatives",
+              "quantite": "8",
+              "pu_ht": "237",
+              "total_ht": "1896"
+            }
+          ]
+        },
+        "paiement": {
+          "conditions": "30 jours nets",
+          "rib": "FR76 5863 9120 63657190916"
+        },
+        "autres": {
+          "naf": "",
+          "immatriculations": "",
+          "references": ""
+        }
+      },
+      "page_number": 1,
+      "source_file": "doc_0.pdf"
+    }
+  ]
+}

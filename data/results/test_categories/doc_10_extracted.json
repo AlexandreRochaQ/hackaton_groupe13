@@ -1,0 +1,39 @@
+{
+  "document_info": {
+    "source_file": "doc_10.pdf",
+    "pages_processed": 1
+  },
+  "extracted_data": [
+    {
+      "document_type": "facture",
+      "company_name": "Faivre Leduc S.A.R.L.",
+      "siren": "549646628",
+      "siret": "54964662898995",
+      "invoice_number": "FA-4918-2026",
+      "date": "2026-03-17",
+      "amount": "990",
+      "additional_info": {
+        "nom_complet": "Robert Daniel",
+        "date_de_naissance": "",
+        "adresse_complete": {
+          "numéro": "",
+          "rue": "8, boulevard Bernard Guillot",
+          "code_postal": "21920",
+          "ville": "Guil"
+        },
+        "coordonnées": {
+          "téléphone": "",
+          "email": "",
+          "site_web": ""
+        },
+        "établissement_scolaire/entreprise": "",
+        "code_naf/ape": "",
+        "numéro_d'immatriculation": "",
+        "tva_intracommunautaire": "",
+        "autre_information": "Re-intermediate end-to-end synergie"
+      },
+      "page_number": 1,
+      "source_file": "doc_10.pdf"
+    }
+  ]
+}

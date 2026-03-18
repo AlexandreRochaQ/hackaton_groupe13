@@ -1,0 +1,65 @@
+{
+  "document_info": {
+    "source_file": "doc_10.pdf",
+    "pages_processed": 1
+  },
+  "extracted_data": [
+    {
+      "document_type": "facture",
+      "company_name": "Faivre Leduc S.A.R.L.",
+      "siren": "549646628",
+      "siret": "54964662898995",
+      "invoice_number": "FA-4918-2026",
+      "date": "2026-03-17",
+      "amount": "990",
+      "additional_info": {
+        "emetteur": "Faivre Leduc S.A.R.L.",
+        "client": "Robert Daniel",
+        "adresses": {
+          "entreprise": {
+            "adresse": "75, avenue Antoine Robin, 07957 François-la-Forêt"
+          },
+          "client": {
+            "adresse": "8, boulevard Bernard Guillot, 21920 Guil"
+          }
+        },
+        "contacts": {
+          "entreprise": {
+            "telephone": "",
+            "email": "",
+            "site_web": ""
+          },
+          "client": {
+            "telephone": "",
+            "email": "",
+            "site_web": ""
+          }
+        },
+        "montants": {
+          "total_ht": "825",
+          "tva": "165",
+          "total_ttc": "990",
+          "articles": [
+            {
+              "quantite": "3",
+              "pu_ht": "275",
+              "description": ""
+            }
+          ]
+        },
+        "paiement": {
+          "conditions": "30 jours nets",
+          "rib": "FR76 6634 6752 34089365638",
+          "echeance": "16/04/2026"
+        },
+        "autres": {
+          "codes_naf": "",
+          "immatriculations": "",
+          "references": ""
+        }
+      },
+      "page_number": 1,
+      "source_file": "doc_10.pdf"
+    }
+  ]
+}
