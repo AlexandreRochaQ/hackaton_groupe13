@@ -5,6 +5,7 @@ export async function uploadDocuments(files) {
   files.forEach(file => formData.append('files', file))
   const res = await api.post('/documents/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000, // 2 min — pipeline now runs synchronously during upload
   })
   return res.data.data // { batchId, documents }
 }

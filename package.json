@@ -3,11 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "start": "powershell -ExecutionPolicy Bypass -File start.ps1",
     "dev": "concurrently --names \"API,UI\" --prefix-colors \"cyan,magenta\" \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
     "install:all": "npm install --prefix backend && npm install --prefix frontend",
     "build": "npm run build --prefix frontend",
-    "clean": "rimraf node_modules frontend/node_modules backend/node_modules frontend/dist frontend/.vite backend/uploads && find . -type d -name __pycache__ -not -path '*/node_modules/*' -exec rm -rf {} + 2>/dev/null; find . -type d -name .ipynb_checkpoints -not -path '*/node_modules/*' -exec rm -rf {} + 2>/dev/null; find . -name '*.pyc' -not -path '*/node_modules/*' -delete 2>/dev/null; echo 'Clean done.'"
+    "clean": "rimraf node_modules frontend/node_modules backend/node_modules frontend/dist frontend/.vite"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
