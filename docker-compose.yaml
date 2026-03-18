@@ -94,20 +94,17 @@ services:
 
   ner-service:
     build:
-      context: ./services/ner
+      context: ./services/ner-service
       dockerfile: Dockerfile
     ports:
-      - "5002:5002"
+      - "5002:8001"
     volumes:
-      - ./services/ner:/app
-      - ./validation:/app/validation
+      - ./services/ner-service:/app
     environment:
       MONGO_URI: mongodb://mongo:27017
       MONGO_DB: docuflow
-      OLLAMA_URL: http://ollama:11434
     depends_on:
       - mongo
-      - ollama
     networks:
       - docuflow-net
 

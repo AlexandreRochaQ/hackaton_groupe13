@@ -1,13 +1,16 @@
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import { fileURLToPath } from 'url'
+import { dirname, resolve } from 'path'
 import documentsRouter from './routes/documents.js'
 import extractionRouter from './routes/extraction.js'
 import validationRouter from './routes/validation.js'
 import crmRouter from './routes/crm.js'
 import complianceRouter from './routes/compliance.js'
 
-dotenv.config()
+const __dirname = dirname(fileURLToPath(import.meta.url))
+dotenv.config({ path: resolve(__dirname, '../.env') })
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -24,7 +27,7 @@ app.use('/api/compliance', complianceRouter)
 app.get('/.well-known/*', (_req, res) => res.status(204).end())
 
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', mock: process.env.USE_MOCK_SERVICES === 'true', ts: new Date().toISOString() })
+  res.json({ status: 'ok', ts: new Date().toISOString() })
 })
 
 app.use((err, _req, res, _next) => {
@@ -34,5 +37,4 @@ app.use((err, _req, res, _next) => {
 
 app.listen(PORT, () => {
   console.log(`BFF running → http://localhost:${PORT}`)
-  console.log(`Mock mode: ${process.env.USE_MOCK_SERVICES === 'true' ? 'ON ✓' : 'OFF'}`)
 })

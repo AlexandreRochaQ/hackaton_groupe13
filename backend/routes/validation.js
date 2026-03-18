@@ -1,9 +1,8 @@
 import { Router } from 'express'
-import { getBatch } from '../mocks/mockStore.js'
+import { getBatch } from '../services/batchStore.js'
 
 const router = Router()
 
-// GET /api/validation/:batchId
 router.get('/:batchId', (req, res) => {
   const batch = getBatch(req.params.batchId)
   if (!batch) return res.status(404).json({ success: false, error: 'Batch not found' })

@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { getBatch } from '../mocks/mockStore.js'
+import { getBatch } from '../services/batchStore.js'
 
 const router = Router()
 

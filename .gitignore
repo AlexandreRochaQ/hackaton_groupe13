@@ -7,6 +7,7 @@ build/
 .env.local
 .env.*.local
 *.env.docker
+!.env.example
 
 *.log
 logs/
@@ -57,11 +58,13 @@ ENV/
 .ipynb_checkpoints/
 
 backend/uploads/
-data-lake/.env
-data/results/*.json
+ocr-service/raw/*
+!ocr-service/raw/.gitkeep
+data/results*/
 data/temp/
 test_output/
 sample_results/
 
 airflow/logs/
 airflow/plugins/
+plugins/

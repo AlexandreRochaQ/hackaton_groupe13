@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import multer from 'multer'
-import { createBatch, getBatch } from '../mocks/mockStore.js'
+import { createBatch, getBatch } from '../services/batchStore.js'
 
 const router = Router()
 const upload = multer({ storage: multer.memoryStorage() })
