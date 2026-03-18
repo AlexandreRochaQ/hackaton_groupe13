@@ -24,7 +24,6 @@ export default function ExtractedFields({ extraction }) {
 
   return (
     <div className="flex-1 overflow-auto">
-      {/* Document header */}
       <div className="px-5 py-4 border-b border-slate-100">
         <div className="flex items-center justify-between">
           <div>
@@ -38,24 +37,30 @@ export default function ExtractedFields({ extraction }) {
         </div>
       </div>
 
-      {/* Fields table */}
-      <div className="divide-y divide-slate-50">
-        {fields.map(field => (
-          <div key={field.label} className="flex items-center px-5 py-3.5 hover:bg-slate-50/60">
-            <div className="w-48 flex-shrink-0">
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{field.label}</p>
+      {fields.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-2 py-16 text-slate-400">
+          <p className="text-sm">Aucun champ extrait pour ce document.</p>
+          <p className="text-xs text-slate-300">Le service OCR a retourné du texte insuffisant.</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-slate-50">
+          {fields.map(field => (
+            <div key={field.label} className="flex items-center px-5 py-3.5 hover:bg-slate-50/60">
+              <div className="w-48 flex-shrink-0">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{field.label}</p>
+              </div>
+              <div className="flex-1 flex items-center gap-3">
+                <p className="text-sm font-semibold text-slate-900">{field.value}</p>
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-xs font-medium">
+                  <Cpu size={9} />
+                  IA
+                </span>
+              </div>
+              <ConfidenceDot value={field.confidence} />
             </div>
-            <div className="flex-1 flex items-center gap-3">
-              <p className="text-sm font-semibold text-slate-900">{field.value}</p>
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-xs font-medium">
-                <Cpu size={9} />
-                IA
-              </span>
-            </div>
-            <ConfidenceDot value={field.confidence} />
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

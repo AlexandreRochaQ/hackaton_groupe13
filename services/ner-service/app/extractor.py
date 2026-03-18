@@ -1,5 +1,4 @@
 import re
-import spacy
 from datetime import datetime
 from app.patterns import (
     SIRET_PATTERN, SIREN_PATTERN, TVA_PATTERN,
@@ -8,12 +7,10 @@ from app.patterns import (
     INVOICE_NUMBER_PATTERN, DOCUMENT_TYPE_KEYWORDS
 )
 
-# Chargement du modèle spaCy français
-try:
-    nlp = spacy.load("fr_core_news_sm")
-except OSError:
-    nlp = None
-    print("Warning: modèle spaCy fr_core_news_sm non trouvé. Lancer: python -m spacy download fr_core_news_sm")
+COMPANY_PATTERN = re.compile(
+    r'([A-Z][A-Z0-9\s\-\.&\']{2,40}(?:SAS|SARL|SA|EURL|SNC|SCA|SASU|GmbH|LLC))',
+    re.UNICODE
+)
 
 
 def clean_amount(raw: str) -> float | None:
@@ -37,14 +34,8 @@ def detect_document_type(text: str) -> str | None:
 
 
 def extract_company_name(text: str) -> str | None:
-    """Utilise spaCy pour détecter la raison sociale (entité ORG)."""
-    if nlp is None:
-        return None
-    doc = nlp(text[:1000])  # on limite à 1000 chars pour la perf
-    for ent in doc.ents:
-        if ent.label_ == "ORG":
-            return ent.text.strip()
-    return None
+    match = COMPANY_PATTERN.search(text[:1000])
+    return match.group(1).strip() if match else None
 
 
 def normalize_date(date_str: str) -> str | None:

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -NoProfile -Command \"& { $null = [System.Management.Automation.Language.Parser]::ParseFile\\(''c:/Users/Y.chehboub/Downloads/PROD_DATA_SCH/hackaton_groupe13/start.ps1'', [ref]$null, [ref]$null\\); Write-Host ''Parse OK'' }\")",
+      "Bash(powershell -NoProfile -File \"c:/Users/Y.chehboub/Downloads/PROD_DATA_SCH/hackaton_groupe13/start.ps1\")",
+      "Bash(find c:UsersY.chehboubDownloadsPROD_DATA_SCHhackaton_groupe13/frontend/src -type f -name *.jsx -o -name *.js -o -name *.css)",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(data[0][''''text'''']\\)\")"
+    ]
+  }
+}

@@ -41,6 +41,10 @@ export function nerToExtraction(doc, nerResult) {
     }
   }
 
+  if (type === 'kbis' && nerResult.issue_date) {
+    fields.dateExtrait = field(nerResult.issue_date, "Date de l'extrait", conf)
+  }
+
   Object.keys(fields).forEach(k => { if (!fields[k]) delete fields[k] })
 
   return {

@@ -120,7 +120,7 @@ export default function InconsistencyPanel({ validation }) {
       </div>
 
       {/* Items */}
-      <div className="p-4 space-y-2 max-h-72 overflow-y-auto scrollbar-thin">
+      <div className="p-4 space-y-2 max-h-80 overflow-y-auto">
         {inconsistencies.length === 0 ? (
           <div className="flex items-center gap-2 text-green-600 text-sm">
             <CheckCircle2 size={16} />

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { CheckCircle2, Circle, Loader2, Building2, ShieldCheck, AlertTriangle } from 'lucide-react'
+import { CheckCircle2, Circle, Loader2, Building2, ShieldCheck, AlertTriangle, XCircle } from 'lucide-react'
 import { getBatchStatus } from '../../api/documents.js'
 import { getExtraction } from '../../api/extraction.js'
 import { getValidation } from '../../api/validation.js'
@@ -27,11 +27,12 @@ const STEP_LABELS = {
 
 function PipelineProgress({ currentStep }) {
   const current = PIPELINE_STEPS.findIndex(s => s.key === currentStep)
+  const allDone = currentStep === 'ready'
   return (
     <div className="flex items-center">
       {PIPELINE_STEPS.map((step, i) => {
-        const done = i < current
-        const active = i === current
+        const done = allDone ? true : i < current
+        const active = !allDone && i === current
         return (
           <div key={step.key} className="flex items-center">
             <div className="flex flex-col items-center gap-1">
@@ -66,7 +67,7 @@ export default function ReviewPage() {
   const { data: statusData } = useQuery({
     queryKey: ['batch-status', batchId],
     queryFn: () => getBatchStatus(batchId),
-    refetchInterval: data => (data?.isReady ? false : 2500),
+    refetchInterval: query => (query.state.data?.isReady ? false : 2500),
     enabled: !!batchId,
   })
 
@@ -91,7 +92,7 @@ export default function ReviewPage() {
   const critiques = validation?.summary?.critiques || 0
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col h-full">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
         <div>
           <h1 className="text-lg font-bold text-slate-900">Révision & extraction</h1>
@@ -143,7 +144,15 @@ export default function ReviewPage() {
         </div>
 
         <div className="flex-1 flex flex-col min-h-0 bg-white">
-          {!isReady ? (
+          {pipelineStep === 'error' ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-4 text-red-400">
+              <XCircle size={32} />
+              <div className="text-center">
+                <p className="text-base font-medium text-red-600">Erreur durant le traitement</p>
+                <p className="text-sm mt-1 text-slate-400">Vérifiez que les services OCR et NER sont bien démarrés.</p>
+              </div>
+            </div>
+          ) : !isReady ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-4 text-slate-400">
               <Loader2 size={32} className="animate-spin text-blue-400" />
               <div className="text-center">

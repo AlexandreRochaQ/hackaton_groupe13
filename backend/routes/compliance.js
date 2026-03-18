@@ -3,6 +3,15 @@ import { getBatch } from '../services/batchStore.js'
 
 const router = Router()
 
+function isExpired(dateValue) {
+  if (!dateValue) return false
+  const parts = dateValue.split('/')
+  const d = parts.length === 3
+    ? new Date(parts[2], parts[1] - 1, parts[0])
+    : new Date(dateValue)
+  return !isNaN(d.getTime()) && d < new Date()
+}
+
 router.get('/:batchId', (req, res) => {
   const batch = getBatch(req.params.batchId)
   if (!batch) return res.status(404).json({ success: false, error: 'Batch not found' })
@@ -21,6 +30,17 @@ router.get('/:batchId', (req, res) => {
   const facture = byType.facture || {}
   const hasCritiques = validation.summary.critiques > 0
 
+  const urssafDateVal = urssaf.dateExpiration?.value || null
+  const urssafExpired = isExpired(urssafDateVal)
+  const urssafStatus = !urssafDateVal ? 'non_fourni' : urssafExpired ? 'non_conforme' : 'conforme'
+  const urssafDetail = !urssafDateVal
+    ? 'Attestation non fournie'
+    : urssafExpired
+      ? `Attestation expirée le ${urssafDateVal} — renouvellement requis`
+      : `Attestation valide jusqu'au ${urssafDateVal}`
+
+  const globalNonConforme = hasCritiques || urssafExpired
+
   res.json({
     success: true,
     data: {
@@ -29,12 +49,10 @@ router.get('/:batchId', (req, res) => {
       checks: {
         urssaf: {
           label: 'Attestation de vigilance URSSAF',
-          status: urssaf.dateExpiration ? 'non_conforme' : 'non_fourni',
-          dateExpiration: urssaf.dateExpiration?.value || null,
+          status: urssafStatus,
+          dateExpiration: urssafDateVal,
           siretAttestation: urssaf.siret?.value || null,
-          detail: urssaf.dateExpiration
-            ? 'Attestation expirée le 31/12/2025 — renouvellement requis'
-            : 'Attestation non fournie',
+          detail: urssafDetail,
         },
         kbis: {
           label: 'Extrait Kbis',
@@ -50,7 +68,7 @@ router.get('/:batchId', (req, res) => {
             : 'SIRET cohérent sur tous les documents',
         },
       },
-      globalStatus: hasCritiques ? 'non_conforme' : 'conforme',
+      globalStatus: globalNonConforme ? 'non_conforme' : 'conforme',
       inconsistencies: validation.inconsistencies,
     },
   })
