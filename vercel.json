@@ -3,7 +3,8 @@
   "builds": [
     {
       "src": "backend/app.js",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": { "memory": 1024, "maxDuration": 60 }
     },
     {
       "src": "frontend/package.json",
@@ -15,11 +16,5 @@
     { "src": "/api/(.*)", "dest": "/backend/app.js" },
     { "src": "/health", "dest": "/backend/app.js" },
     { "src": "/(.*)", "dest": "/frontend/$1" }
-  ],
-  "functions": {
-    "backend/app.js": {
-      "memory": 1024,
-      "maxDuration": 60
-    }
-  }
+  ]
 }
