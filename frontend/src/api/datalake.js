@@ -11,3 +11,8 @@ export async function getDataLakeZone(zone, batchId) {
   const res = await api.get(`/datalake/${zone}`, { params })
   return res.data
 }
+
+export async function getDataLakeOverview() {
+  const res = await api.get('/datalake/overview')
+  return res.data.data
+}

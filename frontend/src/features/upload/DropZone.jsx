@@ -37,22 +37,25 @@ export default function DropZone({ onFilesAdded, onFilesRejected, disabled }) {
   const borderColor = isDragReject
     ? 'border-red-400 bg-red-50'
     : isDragActive
-    ? 'border-blue-500 bg-blue-50'
-    : 'border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50/30'
+    ? 'border-brand-500 bg-brand-50'
+    : 'border-brand-100 bg-brand-50/20 hover:border-brand-500 hover:bg-brand-50/40'
 
   return (
     <div
       {...getRootProps()}
-      className={`border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all duration-200 ${borderColor} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+      className={`group border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all duration-200 ${borderColor} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
     >
       <input {...getInputProps()} />
       <div className="flex flex-col items-center gap-4">
-        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-colors ${isDragActive ? 'bg-blue-100' : 'bg-slate-100'}`}>
-          <UploadCloud size={28} className={isDragActive ? 'text-blue-600' : 'text-slate-400'} />
+        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-colors ${isDragActive ? 'bg-brand-100' : 'bg-slate-100'}`}>
+          <UploadCloud
+            size={28}
+            className={`transition-transform duration-200 ${isDragActive ? 'text-brand-500' : 'text-slate-400 group-hover:scale-110'}`}
+          />
         </div>
 
         {isDragActive && !isDragReject && (
-          <p className="text-blue-600 font-semibold text-lg">Déposez vos fichiers ici</p>
+          <p className="text-brand-600 font-semibold text-lg">Déposez vos fichiers ici</p>
         )}
         {isDragReject && (
           <p className="text-red-600 font-semibold text-lg">Format non supporté</p>
@@ -61,16 +64,11 @@ export default function DropZone({ onFilesAdded, onFilesRejected, disabled }) {
           <>
             <div>
               <p className="text-slate-700 font-semibold text-base">
-                Glissez vos documents ici
+                Déposez vos factures, Kbis ou attestations ici
               </p>
               <p className="text-slate-400 text-sm mt-1">ou cliquez pour sélectionner</p>
             </div>
-            <p className="text-slate-400 text-xs">
-              PDF, JPG, PNG, TIFF — max 20 Mo par fichier
-            </p>
-            <p className="text-slate-400 text-xs -mt-2">
-              Factures, devis, Kbis, attestations URSSAF, RIB
-            </p>
+            <p className="text-slate-400 text-xs">PDF, JPG, PNG, TIFF — max 20 Mo par fichier</p>
           </>
         )}
       </div>

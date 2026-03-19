@@ -152,3 +152,29 @@ export async function getDataLakeZone(zone, batchId) {
   const filter = batchId ? { batchId } : {}
   return db.collection(zone).find(filter, { projection: { _id: 0 } }).toArray()
 }
+
+export async function listBatches(page = 1, limit = 10) {
+  const db = await getDb()
+  const skip = (page - 1) * limit
+  const [batches, total] = await Promise.all([
+    db.collection('batches')
+      .find({}, { projection: { _id: 0, batchId: 1, pipelineStep: 1, createdAt: 1, documents: 1 } })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray(),
+    db.collection('batches').countDocuments(),
+  ])
+  return {
+    batches: batches.map(b => ({
+      batchId: b.batchId,
+      createdAt: b.createdAt,
+      documentCount: b.documents?.length || 0,
+      status: b.pipelineStep === 'ready' ? 'traité' : b.pipelineStep === 'error' ? 'erreur' : 'en cours',
+      operator: 'Opérateur',
+    })),
+    total,
+    page,
+    pages: Math.ceil(total / limit),
+  }
+}

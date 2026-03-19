@@ -4,6 +4,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App.jsx'
 import './index.css'
 
+console.log('%cDocFlow v1.0 🚀', 'color: #4361ee; font-weight: bold; font-size: 14px')
+console.log('Hackathon 2026 — Groupe 13')
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

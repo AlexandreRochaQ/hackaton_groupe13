@@ -9,6 +9,7 @@ import validationRouter from './routes/validation.js'
 import crmRouter from './routes/crm.js'
 import complianceRouter from './routes/compliance.js'
 import datalakeRouter from './routes/datalake.js'
+import logsRouter from './routes/logs.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 dotenv.config({ path: resolve(__dirname, '../.env') })
@@ -29,6 +30,7 @@ app.use('/api/validation', validationRouter)
 app.use('/api/crm', crmRouter)
 app.use('/api/compliance', complianceRouter)
 app.use('/api/datalake', datalakeRouter)
+app.use('/api/logs', logsRouter)
 
 app.get('/.well-known/*', (_req, res) => res.status(204).end())
 

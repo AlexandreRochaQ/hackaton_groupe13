@@ -4,8 +4,12 @@
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
+    @apply bg-surface text-slate-900 antialiased;
     font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  a, button {
+    transition: all 150ms ease;
   }
 }
 
@@ -14,4 +18,37 @@
     scrollbar-width: thin;
     scrollbar-color: #cbd5e1 transparent;
   }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@layer utilities {
+  .animate-fade-in { animation: fadeIn 200ms ease-out both; }
+  .animate-slide-up { animation: slideUp 250ms ease-out both; }
+  .animate-slide-in { animation: slideIn 200ms ease-out both; }
+  .animation-delay-100 { animation-delay: 100ms; }
+  .animation-delay-200 { animation-delay: 200ms; }
+  .animation-delay-300 { animation-delay: 300ms; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@media print {
+  .print-hidden { display: none !important; }
 }
