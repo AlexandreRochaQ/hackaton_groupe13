@@ -13,6 +13,11 @@ import datalakeRouter from './routes/datalake.js'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 dotenv.config({ path: resolve(__dirname, '../.env') })
 
+// Node.js v24 + OpenSSL 3 has stricter TLS — bypass for outbound API calls in dev
+if (process.env.NODE_ENV !== 'production') {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+}
+
 const app = express()
 
 app.use(cors())

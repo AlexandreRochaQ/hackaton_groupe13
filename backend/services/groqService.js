@@ -4,10 +4,45 @@ import sharp from 'sharp'
 import { createCanvas } from 'canvas'
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs'
 
-let _groq = null
+// Support multiple API keys: GROQ_API_KEY=key1,key2,key3
+let _keys = null
+let _keyIndex = 0
+const _clients = {}
+
+function getKeys() {
+  if (!_keys) _keys = (process.env.GROQ_API_KEY || '').split(',').map(k => k.trim()).filter(Boolean)
+  return _keys
+}
+
 function getGroq() {
-  if (!_groq) _groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
-  return _groq
+  if (!getKeys().length) throw new Error('No GROQ_API_KEY configured')
+  const key = getKeys()[_keyIndex]
+  if (!_clients[key]) _clients[key] = new Groq({ apiKey: key })
+  return _clients[key]
+}
+
+function rotateKey() {
+  if (_keys.length > 1) {
+    _keyIndex = (_keyIndex + 1) % _keys.length
+    console.warn(`[groqService] Rotated to API key #${_keyIndex + 1}`)
+  }
+}
+
+async function groqCall(fn) {
+  const attempts = getKeys().length || 1
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn(getGroq())
+    } catch (err) {
+      const isQuota = err?.status === 429 || err?.status === 413 ||
+        /rate.limit|quota|too many/i.test(err?.message || '')
+      if (isQuota && i < getKeys().length - 1) {
+        rotateKey()
+        continue
+      }
+      throw err
+    }
+  }
 }
 
 const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
@@ -120,7 +155,7 @@ async function extractFromImage(buffer, mimeType, documentId) {
   const processed = await preprocessImage(buffer)
   const base64 = processed.toString('base64')
 
-  const completion = await getGroq().chat.completions.create({
+  const completion = await groqCall(groq => groq.chat.completions.create({
     model: VISION_MODEL,
     messages: [
       {
@@ -139,7 +174,7 @@ async function extractFromImage(buffer, mimeType, documentId) {
     ],
     temperature: 0.1,
     max_tokens: 1024,
-  })
+  }))
 
   const content = completion.choices[0]?.message?.content || '{}'
   const structured = parseJson(content, documentId)
@@ -181,7 +216,7 @@ async function extractFromPageImages(images, documentId) {
  * Returns { rawText, structured }.
  */
 async function extractFromText(rawText, documentId) {
-  const completion = await getGroq().chat.completions.create({
+  const completion = await groqCall(groq => groq.chat.completions.create({
     model: TEXT_MODEL,
     messages: [
       {
@@ -192,7 +227,7 @@ async function extractFromText(rawText, documentId) {
     temperature: 0.1,
     max_tokens: 1024,
     response_format: { type: 'json_object' },
-  })
+  }))
 
   const content = completion.choices[0]?.message?.content || '{}'
   const structured = parseJson(content, documentId)
