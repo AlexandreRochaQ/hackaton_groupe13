@@ -10,6 +10,7 @@ async function getDb() {
   if (cachedDb) return cachedDb
   cachedClient = new MongoClient(process.env.MONGO_URI, {
     serverSelectionTimeoutMS: 10000,
+    tlsAllowInvalidCertificates: true,
   })
   await cachedClient.connect()
   cachedDb = cachedClient.db(process.env.MONGO_DB || 'docuflow')

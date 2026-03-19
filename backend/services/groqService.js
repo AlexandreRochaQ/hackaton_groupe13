@@ -1,10 +1,48 @@
 import Groq from 'groq-sdk'
 import pdfParse from 'pdf-parse'
+import sharp from 'sharp'
+import { createCanvas } from 'canvas'
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs'
 
-let _groq = null
+// Support multiple API keys: GROQ_API_KEY=key1,key2,key3
+let _keys = null
+let _keyIndex = 0
+const _clients = {}
+
+function getKeys() {
+  if (!_keys) _keys = (process.env.GROQ_API_KEY || '').split(',').map(k => k.trim()).filter(Boolean)
+  return _keys
+}
+
 function getGroq() {
-  if (!_groq) _groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
-  return _groq
+  if (!getKeys().length) throw new Error('No GROQ_API_KEY configured')
+  const key = getKeys()[_keyIndex]
+  if (!_clients[key]) _clients[key] = new Groq({ apiKey: key })
+  return _clients[key]
+}
+
+function rotateKey() {
+  if (_keys.length > 1) {
+    _keyIndex = (_keyIndex + 1) % _keys.length
+    console.warn(`[groqService] Rotated to API key #${_keyIndex + 1}`)
+  }
+}
+
+async function groqCall(fn) {
+  const attempts = getKeys().length || 1
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn(getGroq())
+    } catch (err) {
+      const isQuota = err?.status === 429 || err?.status === 413 ||
+        /rate.limit|quota|too many/i.test(err?.message || '')
+      if (isQuota && i < getKeys().length - 1) {
+        rotateKey()
+        continue
+      }
+      throw err
+    }
+  }
 }
 
 const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
@@ -38,6 +76,64 @@ Rules:
 - Return ONLY valid JSON, no markdown, no commentary`
 
 /**
+ * Pre-process an image buffer with sharp:
+ * - Normalize contrast/brightness
+ * - Resize to max 2048px (Groq Vision optimal size)
+ * - Convert to JPEG for smaller payload
+ */
+async function preprocessImage(buffer) {
+  try {
+    return await sharp(buffer)
+      .rotate()                              // auto-rotate based on EXIF
+      .normalize()                           // stretch contrast for better OCR
+      .sharpen({ sigma: 1 })                 // sharpen edges
+      .resize(2048, 2048, {
+        fit: 'inside',
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: 88 })
+      .toBuffer()
+  } catch {
+    return buffer // fallback to original if sharp fails
+  }
+}
+
+/**
+ * Render all pages of a scanned PDF to JPEG images using pdfjs-dist + canvas.
+ * Returns an array of image buffers (one per page).
+ */
+async function pdfToImages(buffer) {
+  try {
+    const uint8Array = new Uint8Array(buffer)
+    const loadingTask = pdfjsLib.getDocument({ data: uint8Array, useSystemFonts: true })
+    const pdf = await loadingTask.promise
+    const images = []
+
+    for (let pageNum = 1; pageNum <= Math.min(pdf.numPages, 3); pageNum++) {
+      const page = await pdf.getPage(pageNum)
+      const scale = 2.0                       // 2x scale for better resolution
+      const viewport = page.getViewport({ scale })
+
+      const canvas = createCanvas(viewport.width, viewport.height)
+      const ctx = canvas.getContext('2d')
+
+      await page.render({
+        canvasContext: ctx,
+        viewport,
+      }).promise
+
+      const imgBuffer = canvas.toBuffer('image/jpeg', { quality: 0.88 })
+      images.push(imgBuffer)
+    }
+
+    return images
+  } catch (err) {
+    console.error('[groqService] PDF→image render failed:', err.message)
+    return []
+  }
+}
+
+/**
  * Extract text from a PDF buffer using pdf-parse.
  * Works for digitally-created PDFs. Returns empty string for scanned PDFs.
  */
@@ -52,11 +148,14 @@ async function extractPdfText(buffer) {
 
 /**
  * Extract structured data from an image buffer using Groq Vision.
+ * Applies pre-processing before sending.
  * Returns { rawText, structured }.
  */
 async function extractFromImage(buffer, mimeType, documentId) {
-  const base64 = buffer.toString('base64')
-  const completion = await getGroq().chat.completions.create({
+  const processed = await preprocessImage(buffer)
+  const base64 = processed.toString('base64')
+
+  const completion = await groqCall(groq => groq.chat.completions.create({
     model: VISION_MODEL,
     messages: [
       {
@@ -64,7 +163,7 @@ async function extractFromImage(buffer, mimeType, documentId) {
         content: [
           {
             type: 'image_url',
-            image_url: { url: `data:${mimeType};base64,${base64}` },
+            image_url: { url: `data:image/jpeg;base64,${base64}` },
           },
           {
             type: 'text',
@@ -75,7 +174,7 @@ async function extractFromImage(buffer, mimeType, documentId) {
     ],
     temperature: 0.1,
     max_tokens: 1024,
-  })
+  }))
 
   const content = completion.choices[0]?.message?.content || '{}'
   const structured = parseJson(content, documentId)
@@ -83,11 +182,41 @@ async function extractFromImage(buffer, mimeType, documentId) {
 }
 
 /**
+ * Extract from multiple page images (used for scanned PDFs).
+ * Sends up to 3 pages; merges results from first successful page.
+ */
+async function extractFromPageImages(images, documentId) {
+  // Try all pages and use the most confident result
+  const results = []
+
+  for (const imgBuffer of images) {
+    try {
+      const result = await extractFromImage(imgBuffer, 'image/jpeg', documentId)
+      results.push(result)
+    } catch (err) {
+      console.warn('[groqService] Page extraction failed:', err.message)
+    }
+  }
+
+  if (results.length === 0) {
+    return {
+      rawText: '[SCANNED_PDF — all pages failed]',
+      structured: parseJson('{}', documentId),
+    }
+  }
+
+  // Return result with highest confidence
+  return results.reduce((best, cur) =>
+    (cur.structured?.confidence ?? 0) > (best.structured?.confidence ?? 0) ? cur : best
+  )
+}
+
+/**
  * Extract structured data from raw OCR text using Groq chat.
  * Returns { rawText, structured }.
  */
 async function extractFromText(rawText, documentId) {
-  const completion = await getGroq().chat.completions.create({
+  const completion = await groqCall(groq => groq.chat.completions.create({
     model: TEXT_MODEL,
     messages: [
       {
@@ -98,7 +227,7 @@ async function extractFromText(rawText, documentId) {
     temperature: 0.1,
     max_tokens: 1024,
     response_format: { type: 'json_object' },
-  })
+  }))
 
   const content = completion.choices[0]?.message?.content || '{}'
   const structured = parseJson(content, documentId)
@@ -114,14 +243,28 @@ export async function extractDocument(buffer, filename, mimeType, documentId) {
 
   if (isPdf) {
     const pdfText = await extractPdfText(buffer)
+
     if (pdfText.trim().length > 80) {
+      // Digital PDF — use fast text extraction path
       return extractFromText(pdfText, documentId)
     }
-    // Scanned PDF — no extractable text
-    return extractFromText('[Scanned PDF — no extractable text available]', documentId)
+
+    // Scanned PDF — render pages to images and use Vision
+    console.log(`[groqService] Scanned PDF detected for ${filename}, rendering pages…`)
+    const images = await pdfToImages(buffer)
+
+    if (images.length > 0) {
+      return extractFromPageImages(images, documentId)
+    }
+
+    // Last resort fallback
+    return {
+      rawText: '[SCANNED_PDF — render failed, no text available]',
+      structured: parseJson('{}', documentId),
+    }
   }
 
-  // Image file (JPG, PNG, WEBP, etc.)
+  // Image file (JPG, PNG, WEBP, etc.) — pre-process then Vision
   return extractFromImage(buffer, mimeType, documentId)
 }
 
