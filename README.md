@@ -2,42 +2,117 @@
 
 Traitement automatique de pièces comptables et administratives : OCR, extraction d'entités, vérification de cohérence inter-documents, et auto-remplissage d'applications métiers.
 
+Déployable sur **Vercel** sans Docker ni dépendances locales — alimenté par **Groq API** et **MongoDB Atlas**.
+
+---
+
 ## Architecture
 
 ```
-┌─────────────┐     ┌──────────────┐     ┌─────────────────┐
-│   Frontend  │────▶│  API Backend │────▶│   OCR Service   │
-│  React/Vite │     │  Node/Express│     │ Tesseract + LLM │
-│  :3000      │     │  :4000       │     │  :5001          │
-└─────────────┘     └──────┬───────┘     └────────┬────────┘
-                           │                       │
-                    ┌──────▼───────┐     ┌────────▼────────┐
-                    │  NER Service │     │    Data Lake    │
-                    │  FastAPI     │     │    MongoDB      │
-                    │  :5002/8001  │     │  Raw/Clean/     │
-                    └──────────────┘     │  Curated zones  │
-                                         └─────────────────┘
-                    ┌──────────────┐
-                    │   Airflow    │  Pipeline orchestration
-                    │   :8080      │  ingest → OCR → NER → validate
-                    └──────────────┘
-                    ┌──────────────┐
-                    │    Ollama    │  LLM local (llama3.1 / qwen2.5)
-                    │   :11434     │
-                    └──────────────┘
+┌─────────────┐     ┌──────────────────────────────────────────┐
+│   Frontend  │────▶│              API Backend (BFF)            │
+│  React/Vite │     │           Node.js / Express               │
+│  :3000      │     │  documents · extraction · validation      │
+└─────────────┘     │  crm · compliance · datalake · logs       │
+                    └──────┬──────────────────────┬────────────┘
+                           │                      │
+                  ┌────────▼────────┐   ┌─────────▼──────────┐
+                  │   Groq API      │   │   MongoDB Atlas     │
+                  │ llama-4-scout   │   │  Data Lake 3 zones  │
+                  │ (vision/OCR)    │   │  raw / clean /      │
+                  │ llama-3.3-70b   │   │  curated            │
+                  │ (NER/extract)   │   └────────────────────┘
+                  └─────────────────┘
 ```
+
+### Data Lake — 3 zones MongoDB
+
+```
+Upload (PDF / image)
+    ↓
+raw_zone     → métadonnées fichier, type détecté, timestamp
+    ↓
+OCR (Groq Vision llama-4-scout  |  pdf-parse pour PDF natifs)
+    ↓
+clean_zone   → texte OCR brut par document
+    ↓
+Extraction NER (Groq llama-3.3-70b)
+    ↓
+curated_zone → JSON structuré validé (SIRET, TVA, montants, dates…)
+    ↓
+Validation inter-documents → incohérences SIRET, attestations expirées
+    ↓
+API Backend  → CRM auto-rempli + Outil de conformité
+```
+
+---
 
 ## Services
 
 | Service | Stack | Port | Rôle |
 |---|---|---|---|
-| `frontend/` | React 18, Vite, Tailwind | 3000 | Interface upload, révision, CRM, conformité |
-| `backend/` | Node.js, Express | 4000 | BFF — routage API, agrégation, mock/real toggle |
-| `ocr-service/` | Python, Flask, Tesseract | 5001 | OCR PDF/image → texte brut |
-| `services/ner-service/` | Python, FastAPI, spaCy | 8001 (ext: 5002) | Extraction d'entités (SIRET, TVA, montants, dates) |
-| `data-lake/` | Python, MongoDB, GridFS | 27017 | Stockage 3 zones : raw / clean / curated |
-| `validation/` | Python | — | Vérification cohérence inter-documents |
-| `dags/` | Airflow 2.9.1 | 8080 | Orchestration pipeline complet |
+| `frontend/` | React 18, Vite, Tailwind CSS | 3000 | Upload, révision, CRM, conformité, dashboard admin |
+| `backend/` | Node.js 24, Express | 3001 | BFF — pipeline OCR/NER, Data Lake, routes API |
+| **Groq API** | llama-4-scout + llama-3.3-70b | (externe) | OCR vision + extraction d'entités |
+| **MongoDB Atlas** | MongoDB 7 | (externe) | Stockage 3 zones raw/clean/curated |
+
+---
+
+## Démarrage rapide
+
+### Prérequis
+
+- Node.js ≥ 18
+- Compte [Groq](https://console.groq.com) (gratuit) — clé API
+- Cluster [MongoDB Atlas](https://cloud.mongodb.com) (gratuit M0)
+
+### Installation
+
+```bash
+# Cloner et installer toutes les dépendances
+git clone https://github.com/AlexandreRochaQ/hackaton_groupe13
+cd hackaton_groupe13
+npm run install:all
+```
+
+### Variables d'environnement
+
+Créer `.env` à la racine du projet :
+
+```env
+# Groq — supporte plusieurs clés séparées par virgule (rotation automatique)
+GROQ_API_KEY=gsk_xxx,gsk_yyy
+
+# MongoDB Atlas
+MONGO_URI=mongodb+srv://<user>:<password>@cluster0.xxxxx.mongodb.net/
+MONGO_DB=docuflow
+
+# Backend
+PORT=3001
+```
+
+### Lancement
+
+```bash
+npm run dev
+```
+
+| Interface | URL |
+|---|---|
+| Application | http://localhost:3000 |
+| API Backend | http://localhost:3001 |
+| Health check | http://localhost:3001/health |
+
+---
+
+## Rôles utilisateurs
+
+| Rôle | Accès | Identifiant |
+|---|---|---|
+| **Opérateur** | Upload → Révision → CRM → Conformité | Sélectionner "Opérateur" sur la page d'accueil |
+| **Administrateur** | Dashboard Data Lake, Historique, Logs pipeline | Sélectionner "Administrateur" sur la page d'accueil |
+
+---
 
 ## Documents supportés
 
@@ -50,22 +125,78 @@ Traitement automatique de pièces comptables et administratives : OCR, extractio
 | Attestation SIRET | SIRET, raison sociale, état administratif |
 | RIB | IBAN, BIC, titulaire, banque |
 
-## Démarrage
+Formats acceptés : **PDF, JPG, PNG, TIFF** — max 20 Mo par fichier.
 
-### Développement local (frontend + backend uniquement)
+---
 
-```bash
-# Installer toutes les dépendances Node
-npm run install:all
+## Fonctionnalités
 
-# Lancer frontend + backend en parallèle
-npm run dev
+### Opérateur
+
+- **Upload multi-fichiers** — drag & drop avec overlay plein écran, barre de progression réelle
+- **Révision & extraction** — panneau OCR avec indicateur de qualité, édition inline par champ, sélection multiple pour téléchargement ZIP
+- **Classification automatique** — icône par type de document, barre de confiance colorée, badge "À classifier manuellement" si confiance < 50 %
+- **Vérification inter-documents** — panel collapsible, liens visuels entre documents concernés
+- **CRM fournisseur** — auto-remplissage animé champ par champ, historique des modifications avec annulation
+- **Outil de conformité** — timeline des vérifications, section pièces manquantes, export PDF
+
+### Administrateur
+
+- **Vue d'ensemble** — 4 KPIs avec sparklines, diagramme pipeline
+- **Data Lake** — visualisation en temps réel des 3 zones (raw / clean / curated)
+- **Historique** — tableau paginé de tous les lots, filtre par statut, export CSV
+- **Logs pipeline** — terminal dark avec polling toutes les 3s, pause/vider, filtre par niveau (INFO/WARN/ERROR)
+
+---
+
+## Structure du projet
+
+```
+hackaton_groupe13/
+├── backend/                  Node.js BFF
+│   ├── routes/               documents, extraction, validation, crm, compliance, datalake, logs
+│   ├── services/
+│   │   ├── groqService.js    OCR vision + NER via Groq API (multi-key rotation)
+│   │   ├── batchStore.js     MongoDB Data Lake (raw/clean/curated + batches)
+│   │   ├── fileBufferStore.js buffer in-memory pour téléchargement ZIP
+│   │   ├── realPipeline.js   orchestration OCR → NER → validation
+│   │   └── validationService.js vérifications cohérence inter-documents
+│   └── app.js                point d'entrée Express
+├── frontend/                 React 18 SPA
+│   └── src/
+│       ├── features/         upload, review, crm, compliance, admin, login
+│       ├── components/       Layout, Sidebar, Toast, Tooltip, SkeletonCard, StatusBadge
+│       ├── api/              clients Axios par domaine
+│       └── utils/            formatters (SIRET, montant, date)
+├── dags/                     Airflow DAGs (stack Docker optionnelle)
+│   ├── pipeline_documents.py DAG principal ingest → OCR → NER → validate
+│   └── checker.py            règles de vérification
+├── vercel.json               configuration déploiement Vercel
+├── .env                      variables d'environnement (ne pas committer)
+└── package.json              scripts npm racine
 ```
 
-Frontend : http://localhost:3000
-Backend : http://localhost:4000
+---
 
-### Stack complète (Docker)
+## Déploiement Vercel
+
+```bash
+vercel --prod
+```
+
+Variables d'environnement à configurer dans le dashboard Vercel :
+
+| Variable | Description |
+|---|---|
+| `GROQ_API_KEY` | Clé(s) Groq séparées par virgule |
+| `MONGO_URI` | URI MongoDB Atlas |
+| `MONGO_DB` | Nom de la base (ex: `docuflow`) |
+
+---
+
+## Stack Docker (optionnelle)
+
+Pour les équipes souhaitant faire tourner la stack complète en local avec les anciens services Python :
 
 ```bash
 docker-compose up --build
@@ -74,100 +205,23 @@ docker-compose up --build
 | Interface | URL |
 |---|---|
 | Application | http://localhost:3000 |
-| API Backend | http://localhost:4000 |
+| API Backend | http://localhost:3001 |
 | Airflow | http://localhost:8080 (admin/admin) |
 | Mongo Express | http://localhost:8081 |
-| Ollama | http://localhost:11434 |
 
-### Pipeline OCR en ligne de commande
+> La stack Node.js + Groq API fonctionne indépendamment de Docker.
+
+---
+
+## Scripts npm
 
 ```bash
-# Installer les dépendances Python
-pip install -r requirements.txt
-python -m spacy download fr_core_news_sm
-
-# Lancer le pipeline sur un dossier de documents
-python main.py --input data/documents --output data/results
-
-# Options
-python main.py -i facture.pdf -o results/ --verbose --model qwen2.5
+npm run dev           # Lance frontend + backend en parallèle
+npm run install:all   # Installe les dépendances frontend et backend
+npm run clean         # Supprime node_modules/, dist/, fichiers temporaires
 ```
 
-### Variables d'environnement
-
-**`backend/.env`**
-```
-PORT=4000
-USE_MOCK_SERVICES=true
-MONGO_URI=mongodb://localhost:27017
-OCR_SERVICE_URL=http://localhost:5001
-NER_SERVICE_URL=http://localhost:5002
-```
-
-**Requis pour OCR local :**
-```
-TESSERACT_PATH=C:\Program Files\Tesseract-OCR\tesseract.exe
-POPPLER_PATH=C:\chemin\vers\poppler\Library\bin
-OLLAMA_URL=http://localhost:11434
-```
-
-## Structure du projet
-
-```
-hackaton_groupe13/
-├── backend/                  Node.js BFF
-│   ├── routes/               documents, extraction, validation, crm, compliance
-│   └── mocks/                mock store + mock data (dev/demo)
-├── frontend/                 React SPA
-│   └── src/
-│       ├── features/         upload, review, crm, compliance
-│       ├── components/       Layout, Sidebar, StatusBadge, SkeletonCard
-│       └── api/              clients Axios par domaine
-├── ocr-service/              Flask + Tesseract
-│   └── src/                  pipeline, ocr, llm_extractor, yolo_detector
-├── services/
-│   └── ner-service/          FastAPI + spaCy
-│       └── app/              main, extractor, patterns, schemas
-├── data-lake/                MongoDB 3 zones
-│   └── data_lake_config/     mongo-init.js
-├── validation/               checker.py — règles inter-documents
-├── dags/                     Airflow DAG pipeline_documents
-├── data/                     documents d'entrée et résultats
-├── docs/                     rapports, captures, fichiers de référence
-├── main.py                   CLI OCR pipeline (point d'entrée local)
-├── requirements.txt          dépendances Python (tous services)
-├── docker-compose.yaml       stack complète
-└── package.json              scripts npm racine (dev, clean, install:all)
-```
-
-## Pipeline de traitement
-
-```
-Upload (PDF/image)
-    ↓
-OCR Service — Tesseract + LLM Ollama → texte brut
-    ↓
-NER Service — spaCy + regex → entités structurées (SIRET, TVA, montants, dates)
-    ↓
-Data Lake MongoDB
-    ├── Raw zone    → fichier original (GridFS)
-    ├── Clean zone  → texte OCR
-    └── Curated zone → JSON structuré validé
-    ↓
-Validation inter-documents → incohérences SIRET, attestations expirées
-    ↓
-API Backend → CRM auto-rempli + Outil conformité
-```
-
-## Mock mode
-
-Le backend peut fonctionner entièrement sans les services Python (utile pour le développement front-end) :
-
-```
-USE_MOCK_SERVICES=true  # dans backend/.env
-```
-
-En mode mock, le pipeline est simulé avec des données réalistes incluant des incohérences intentionnelles (SIRET mismatch, attestation expirée) pour démontrer les capacités de détection.
+---
 
 ## Nettoyage
 

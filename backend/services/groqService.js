@@ -1,8 +1,6 @@
 import Groq from 'groq-sdk'
 import pdfParse from 'pdf-parse'
 import sharp from 'sharp'
-import { createCanvas } from 'canvas'
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs'
 
 // Support multiple API keys: GROQ_API_KEY=key1,key2,key3
 let _keys = null
@@ -100,10 +98,16 @@ async function preprocessImage(buffer) {
 
 /**
  * Render all pages of a scanned PDF to JPEG images using pdfjs-dist + canvas.
- * Returns an array of image buffers (one per page).
+ * Uses dynamic imports so the module loads cleanly in serverless environments
+ * (Vercel) where native canvas bindings are unavailable — returns [] on failure.
  */
 async function pdfToImages(buffer) {
   try {
+    const [pdfjsLib, { createCanvas }] = await Promise.all([
+      import('pdfjs-dist/legacy/build/pdf.mjs'),
+      import('canvas'),
+    ])
+
     const uint8Array = new Uint8Array(buffer)
     const loadingTask = pdfjsLib.getDocument({ data: uint8Array, useSystemFonts: true })
     const pdf = await loadingTask.promise
@@ -128,7 +132,7 @@ async function pdfToImages(buffer) {
 
     return images
   } catch (err) {
-    console.error('[groqService] PDF→image render failed:', err.message)
+    console.warn('[groqService] PDF→image render not available (canvas/pdfjs):', err.message)
     return []
   }
 }
