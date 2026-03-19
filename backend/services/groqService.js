@@ -1,5 +1,8 @@
 import Groq from 'groq-sdk'
 import pdfParse from 'pdf-parse'
+import sharp from 'sharp'
+import { createCanvas } from 'canvas'
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs'
 
 let _groq = null
 function getGroq() {
@@ -38,6 +41,64 @@ Rules:
 - Return ONLY valid JSON, no markdown, no commentary`
 
 /**
+ * Pre-process an image buffer with sharp:
+ * - Normalize contrast/brightness
+ * - Resize to max 2048px (Groq Vision optimal size)
+ * - Convert to JPEG for smaller payload
+ */
+async function preprocessImage(buffer) {
+  try {
+    return await sharp(buffer)
+      .rotate()                              // auto-rotate based on EXIF
+      .normalize()                           // stretch contrast for better OCR
+      .sharpen({ sigma: 1 })                 // sharpen edges
+      .resize(2048, 2048, {
+        fit: 'inside',
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: 88 })
+      .toBuffer()
+  } catch {
+    return buffer // fallback to original if sharp fails
+  }
+}
+
+/**
+ * Render all pages of a scanned PDF to JPEG images using pdfjs-dist + canvas.
+ * Returns an array of image buffers (one per page).
+ */
+async function pdfToImages(buffer) {
+  try {
+    const uint8Array = new Uint8Array(buffer)
+    const loadingTask = pdfjsLib.getDocument({ data: uint8Array, useSystemFonts: true })
+    const pdf = await loadingTask.promise
+    const images = []
+
+    for (let pageNum = 1; pageNum <= Math.min(pdf.numPages, 3); pageNum++) {
+      const page = await pdf.getPage(pageNum)
+      const scale = 2.0                       // 2x scale for better resolution
+      const viewport = page.getViewport({ scale })
+
+      const canvas = createCanvas(viewport.width, viewport.height)
+      const ctx = canvas.getContext('2d')
+
+      await page.render({
+        canvasContext: ctx,
+        viewport,
+      }).promise
+
+      const imgBuffer = canvas.toBuffer('image/jpeg', { quality: 0.88 })
+      images.push(imgBuffer)
+    }
+
+    return images
+  } catch (err) {
+    console.error('[groqService] PDF→image render failed:', err.message)
+    return []
+  }
+}
+
+/**
  * Extract text from a PDF buffer using pdf-parse.
  * Works for digitally-created PDFs. Returns empty string for scanned PDFs.
  */
@@ -52,10 +113,13 @@ async function extractPdfText(buffer) {
 
 /**
  * Extract structured data from an image buffer using Groq Vision.
+ * Applies pre-processing before sending.
  * Returns { rawText, structured }.
  */
 async function extractFromImage(buffer, mimeType, documentId) {
-  const base64 = buffer.toString('base64')
+  const processed = await preprocessImage(buffer)
+  const base64 = processed.toString('base64')
+
   const completion = await getGroq().chat.completions.create({
     model: VISION_MODEL,
     messages: [
@@ -64,7 +128,7 @@ async function extractFromImage(buffer, mimeType, documentId) {
         content: [
           {
             type: 'image_url',
-            image_url: { url: `data:${mimeType};base64,${base64}` },
+            image_url: { url: `data:image/jpeg;base64,${base64}` },
           },
           {
             type: 'text',
@@ -80,6 +144,36 @@ async function extractFromImage(buffer, mimeType, documentId) {
   const content = completion.choices[0]?.message?.content || '{}'
   const structured = parseJson(content, documentId)
   return { rawText: '[IMAGE_DOCUMENT — OCR via Groq Vision]', structured }
+}
+
+/**
+ * Extract from multiple page images (used for scanned PDFs).
+ * Sends up to 3 pages; merges results from first successful page.
+ */
+async function extractFromPageImages(images, documentId) {
+  // Try all pages and use the most confident result
+  const results = []
+
+  for (const imgBuffer of images) {
+    try {
+      const result = await extractFromImage(imgBuffer, 'image/jpeg', documentId)
+      results.push(result)
+    } catch (err) {
+      console.warn('[groqService] Page extraction failed:', err.message)
+    }
+  }
+
+  if (results.length === 0) {
+    return {
+      rawText: '[SCANNED_PDF — all pages failed]',
+      structured: parseJson('{}', documentId),
+    }
+  }
+
+  // Return result with highest confidence
+  return results.reduce((best, cur) =>
+    (cur.structured?.confidence ?? 0) > (best.structured?.confidence ?? 0) ? cur : best
+  )
 }
 
 /**
@@ -114,14 +208,28 @@ export async function extractDocument(buffer, filename, mimeType, documentId) {
 
   if (isPdf) {
     const pdfText = await extractPdfText(buffer)
+
     if (pdfText.trim().length > 80) {
+      // Digital PDF — use fast text extraction path
       return extractFromText(pdfText, documentId)
     }
-    // Scanned PDF — no extractable text
-    return extractFromText('[Scanned PDF — no extractable text available]', documentId)
+
+    // Scanned PDF — render pages to images and use Vision
+    console.log(`[groqService] Scanned PDF detected for ${filename}, rendering pages…`)
+    const images = await pdfToImages(buffer)
+
+    if (images.length > 0) {
+      return extractFromPageImages(images, documentId)
+    }
+
+    // Last resort fallback
+    return {
+      rawText: '[SCANNED_PDF — render failed, no text available]',
+      structured: parseJson('{}', documentId),
+    }
   }
 
-  // Image file (JPG, PNG, WEBP, etc.)
+  // Image file (JPG, PNG, WEBP, etc.) — pre-process then Vision
   return extractFromImage(buffer, mimeType, documentId)
 }
 
