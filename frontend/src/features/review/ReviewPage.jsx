@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { CheckCircle2, Circle, Loader2, Building2, ShieldCheck, AlertTriangle, XCircle, CheckSquare, Download, X, Square } from 'lucide-react'
+import { CheckCircle2, Circle, Loader2, Building2, ShieldCheck, AlertTriangle, XCircle, CheckSquare, Download, X, Square, BadgeCheck, BadgeAlert } from 'lucide-react'
 import { getBatchStatus } from '../../api/documents.js'
 import { downloadBatch } from '../../api/documents.js'
 import { getExtraction } from '../../api/extraction.js'
@@ -39,20 +39,20 @@ function PipelineProgress({ currentStep }) {
           <div key={step.key} className="flex items-center">
             <div className="flex flex-col items-center gap-1">
               <div className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
-                done ? 'bg-green-500' : active ? 'bg-brand-500' : 'bg-slate-200'
+                done ? 'bg-emerald-500' : active ? 'bg-brand-500' : 'bg-slate-700'
               }`}>
                 {done   && <CheckCircle2 size={14} className="text-white" />}
                 {active && <Loader2 size={13} className="text-white animate-spin" />}
-                {!done && !active && <Circle size={12} className="text-slate-400" />}
+                {!done && !active && <Circle size={12} className="text-slate-500" />}
               </div>
               <span className={`text-xs font-medium whitespace-nowrap ${
-                done ? 'text-green-600' : active ? 'text-brand-500' : 'text-slate-400'
+                done ? 'text-emerald-400' : active ? 'text-brand-400' : 'text-slate-500'
               }`}>
                 {step.label}
               </span>
             </div>
             {i < PIPELINE_STEPS.length - 1 && (
-              <div className={`w-12 h-0.5 mb-4 mx-1 ${done ? 'bg-green-400' : 'bg-slate-200'}`} />
+              <div className={`w-12 h-0.5 mb-4 mx-1 ${done ? 'bg-emerald-500' : 'bg-slate-700'}`} />
             )}
           </div>
         )
@@ -130,6 +130,7 @@ export default function ReviewPage() {
   })
 
   const selectedId = selectedDocId || documents[0]?.id
+  const sireneData = validation?.sireneData || null
 
   const extractionWithOverrides = extraction?.map(e =>
     typeOverrides[e.documentId]
@@ -142,25 +143,46 @@ export default function ReviewPage() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-4 py-3 flex flex-wrap items-center justify-between gap-3 flex-shrink-0 print-hidden">
+      <div className="bg-slate-900 border-b border-slate-800 px-4 py-3 flex flex-wrap items-center justify-between gap-3 flex-shrink-0 print-hidden">
         <div>
-          <h1 className="text-lg font-bold text-slate-900">Analyse des documents</h1>
-          {batchId && <p className="text-xs text-slate-400 font-mono mt-0.5">Lot : {batchId.slice(0, 8)}…</p>}
+          <h1 className="text-lg font-bold text-white">Analyse des documents</h1>
+          {batchId && <p className="text-xs text-slate-500 font-mono mt-0.5">Lot : {batchId.slice(0, 8)}…</p>}
         </div>
         <PipelineProgress currentStep={pipelineStep} />
         {isReady && (
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* SIRENE status badge */}
+            {sireneData && (
+              <span className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border ${
+                sireneData.found && sireneData.isActive
+                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
+                  : sireneData.found
+                  ? 'bg-red-500/10 text-red-400 border-red-500/25'
+                  : 'bg-amber-500/10 text-amber-400 border-amber-500/25'
+              }`}>
+                {sireneData.found && sireneData.isActive
+                  ? <BadgeCheck size={13} />
+                  : <BadgeAlert size={13} />
+                }
+                {sireneData.found && sireneData.isActive
+                  ? 'SIRENE actif'
+                  : sireneData.found
+                  ? 'Entreprise fermée'
+                  : 'SIRET introuvable'
+                }
+              </span>
+            )}
             <button
               onClick={() => navigate(`/crm/${batchId}`)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-sm font-medium"
+              className="flex items-center gap-1.5 px-3 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-sm font-medium transition-colors"
             >
               <Building2 size={14} />
               CRM
             </button>
             <button
               onClick={() => navigate(`/compliance/${batchId}`)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium ${
-                critiques > 0 ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                critiques > 0 ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white'
               }`}
             >
               {critiques > 0 ? <AlertTriangle size={14} /> : <ShieldCheck size={14} />}
@@ -172,15 +194,15 @@ export default function ReviewPage() {
 
       {/* Mobile tabs */}
       {isNarrow && isReady && (
-        <div className="flex border-b border-slate-200 bg-white flex-shrink-0 print-hidden">
+        <div className="flex border-b border-slate-800 bg-slate-900 flex-shrink-0 print-hidden">
           {['documents', 'extraction'].map(tab => (
             <button
               key={tab}
               onClick={() => setMobileTab(tab)}
-              className={`flex-1 py-2.5 text-sm font-medium ${
+              className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
                 mobileTab === tab
-                  ? 'border-b-2 border-brand-500 text-brand-500'
-                  : 'text-slate-500 hover:text-slate-700'
+                  ? 'border-b-2 border-brand-500 text-brand-400'
+                  : 'text-slate-500 hover:text-slate-300'
               }`}
             >
               {tab === 'documents' ? `Documents (${documents.length})` : 'Extraction'}
@@ -191,12 +213,12 @@ export default function ReviewPage() {
 
       <div className="flex flex-1 min-h-0">
         {/* Left column — documents list */}
-        <div className={`${isNarrow ? (mobileTab === 'documents' ? 'flex w-full' : 'hidden') : 'flex w-72'} flex-shrink-0 border-r border-slate-200 bg-slate-50 overflow-y-auto flex-col`}>
+        <div className={`${isNarrow ? (mobileTab === 'documents' ? 'flex w-full' : 'hidden') : 'flex w-72'} flex-shrink-0 border-r border-slate-800 bg-slate-900 overflow-y-auto flex-col`}>
 
           {/* Selection bar */}
           {selectedDocs.size > 0 && (
-            <div className="flex items-center justify-between px-3 py-2 bg-brand-50 border-b border-brand-100 animate-slide-in flex-shrink-0">
-              <span className="flex items-center gap-1.5 text-xs text-brand-700 font-medium">
+            <div className="flex items-center justify-between px-3 py-2 bg-brand-500/10 border-b border-brand-500/20 animate-slide-in flex-shrink-0">
+              <span className="flex items-center gap-1.5 text-xs text-brand-400 font-medium">
                 <CheckSquare size={12} />
                 {selectedDocs.size} sélectionné{selectedDocs.size > 1 ? 's' : ''}
               </span>
@@ -214,7 +236,7 @@ export default function ReviewPage() {
                 </button>
                 <button
                   onClick={() => setSelectedDocs(new Set())}
-                  className="flex items-center gap-1 text-xs px-2 py-1 text-brand-600 hover:bg-brand-100 rounded-lg"
+                  className="flex items-center gap-1 text-xs px-2 py-1 text-brand-400 hover:bg-slate-800 rounded-lg"
                 >
                   <X size={11} />
                 </button>
@@ -250,13 +272,13 @@ export default function ReviewPage() {
         </div>
 
         {/* Right column — extraction */}
-        <div className={`${isNarrow && mobileTab === 'documents' ? 'hidden' : 'flex'} flex-1 flex-col min-h-0 bg-white`}>
+        <div className={`${isNarrow && mobileTab === 'documents' ? 'hidden' : 'flex'} flex-1 flex-col min-h-0 bg-slate-950`}>
           {pipelineStep === 'error' ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-4 text-red-400">
               <XCircle size={32} />
               <div className="text-center">
-                <p className="text-base font-medium text-red-600">Oups, quelque chose s'est mal passé en cours de traitement.</p>
-                <p className="text-sm mt-1 text-slate-400">Vérifie que les services sont bien démarrés.</p>
+                <p className="text-base font-medium text-red-400">Oups, quelque chose s'est mal passé en cours de traitement.</p>
+                <p className="text-sm mt-1 text-slate-500">Vérifie que les services sont bien démarrés.</p>
               </div>
               <button
                 onClick={() => navigate('/upload')}
@@ -266,19 +288,19 @@ export default function ReviewPage() {
               </button>
             </div>
           ) : !isReady ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-4 text-slate-400">
+            <div className="flex-1 flex flex-col items-center justify-center gap-4 text-slate-500">
               <Loader2 size={32} className="animate-spin text-brand-500" />
               <div className="text-center">
-                <p className="text-base font-medium text-slate-600">Traitement en cours…</p>
-                <p className="text-sm mt-1">{STEP_LABELS[pipelineStep]}</p>
+                <p className="text-base font-medium text-slate-300">Traitement en cours…</p>
+                <p className="text-sm mt-1 text-slate-500">{STEP_LABELS[pipelineStep]}</p>
                 {documents.length > 0 && (
-                  <p className="text-xs mt-2 text-brand-500 font-medium">
+                  <p className="text-xs mt-2 text-brand-400 font-medium">
                     {documents.length} document{documents.length > 1 ? 's' : ''} en cours d'analyse
                   </p>
                 )}
               </div>
               {documents.length > 0 && (
-                <div className="w-64 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                <div className="w-64 bg-slate-800 rounded-full h-1.5 overflow-hidden">
                   <div
                     className="h-full bg-brand-500 rounded-full transition-all duration-700"
                     style={{

@@ -45,6 +45,15 @@ export function nerToExtraction(doc, nerResult) {
     fields.dateExtrait = field(nerResult.issue_date, "Date de l'extrait", conf)
   }
 
+  // CRM fields — mapped from extended Groq extraction
+  if (nerResult.iban)       fields.iban           = field(nerResult.iban,       'IBAN', conf)
+  if (nerResult.bic)        fields.bic            = field(nerResult.bic,        'BIC / SWIFT', conf)
+  if (nerResult.banque)     fields.banque         = field(nerResult.banque,     'Banque', conf)
+  if (nerResult.address)    fields.adresse        = field(nerResult.address,    'Adresse', conf)
+  if (nerResult.legal_form) fields.formeJuridique = field(nerResult.legal_form, 'Forme juridique', conf)
+  if (nerResult.capital)    fields.capital        = field(nerResult.capital,    'Capital social', conf)
+  if (nerResult.activity)   fields.activite       = field(nerResult.activity,   'Activité (NAF/APE)', conf)
+
   Object.keys(fields).forEach(k => { if (!fields[k]) delete fields[k] })
 
   return {

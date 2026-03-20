@@ -2,6 +2,7 @@ import { extractText } from './ocrService.js'
 import { extractEntities } from './nerService.js'
 import { nerToExtraction } from './nerMapper.js'
 import { validateExtractions } from './validationService.js'
+import { lookupSiret, findBatchSiret } from './sireneService.js'
 import { logger } from './logger.js'
 
 export async function runRealPipeline(batch) {
@@ -69,14 +70,54 @@ export async function runRealPipeline(batch) {
       }
     }
 
-    // ── Validation ──
+    const extractions = nerOutputs.map(({ doc, nerResult }) => nerToExtraction(doc, nerResult))
+
+    // ── SIRENE enrichment: official company data from data.gouv.fr ──
     step('validating')
 
-    const extractions = nerOutputs.map(({ doc, nerResult }) => nerToExtraction(doc, nerResult))
-    const validation = validateExtractions(extractions)
+    const batchSiret = findBatchSiret(extractions)
+    let sireneData = null
+
+    if (batchSiret) {
+      const extractedName = extractions
+        .map(e => e.fields?.raisonSociale?.value || e.fields?.fournisseur?.value)
+        .filter(Boolean)[0] || null
+
+      logger.info('sirene_lookup', { batchId, siret: batchSiret })
+      const t = Date.now()
+      sireneData = await lookupSiret(batchSiret, extractedName)
+
+      if (sireneData) {
+        logger.info('sirene_result', {
+          batchId,
+          siret: batchSiret,
+          found: sireneData.found,
+          isActive: sireneData.isActive,
+          nameMatchScore: sireneData.nameMatchScore,
+          ms: Date.now() - t,
+        })
+
+        // Propagate SIRENE anomalies back to the extraction that carries the SIRET
+        if (sireneData.anomalies?.length) {
+          for (const ext of extractions) {
+            if (ext.fields?.siret?.value === batchSiret) {
+              ext.anomalies = [...(ext.anomalies || []), ...sireneData.anomalies]
+            }
+          }
+        }
+      } else {
+        logger.warn('sirene_unavailable', { batchId, siret: batchSiret })
+      }
+    } else {
+      logger.info('sirene_skip', { batchId, reason: 'no_siret_found' })
+    }
+
+    // ── Validation (inter-document + SIRENE) ──
+    const validation = validateExtractions(extractions, sireneData)
 
     batch.extraction = extractions
     batch.validation = validation
+    batch.sireneData = sireneData
     delete batch._files
 
     step('ready')
@@ -86,6 +127,8 @@ export async function runRealPipeline(batch) {
       ms: Date.now() - t0,
       critiques: validation.summary.critiques,
       isCompliant: validation.summary.isCompliant,
+      sireneFound: sireneData?.found ?? null,
+      sireneActive: sireneData?.isActive ?? null,
     })
   } catch (e) {
     logger.error('pipeline_error', { batchId, error: e.message, ms: Date.now() - t0 })

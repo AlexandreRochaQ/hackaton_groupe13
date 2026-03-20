@@ -56,7 +56,7 @@ export default function LoginPage() {
         </button>
       </div>
 
-      <p className="text-slate-600 text-xs">
+      <p className="text-slate-400 text-xs">
         DocFlow · Hackathon 2026
       </p>
     </div>

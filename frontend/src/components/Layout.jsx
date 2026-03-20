@@ -21,7 +21,7 @@ export default function Layout() {
         <Sidebar onClose={() => setSidebarOpen(false)} />
       </div>
 
-      <main className="flex-1 min-h-0 overflow-auto">
+      <main className="flex-1 min-h-0 overflow-auto bg-slate-950">
         {/* Mobile top bar with hamburger */}
         <div className="md:hidden flex items-center gap-3 px-4 h-12 border-b border-slate-200 bg-white sticky top-0 z-10">
           <button

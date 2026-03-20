@@ -21,24 +21,24 @@ export default function FileItem({ file, status, rejectionReason, onRemove }) {
   return (
     <div className={`flex items-start gap-3 px-4 py-3 border rounded-lg transition-colors ${
       status === 'invalid'
-        ? 'bg-amber-50 border-amber-200'
+        ? 'bg-amber-500/10 border-amber-500/30'
         : status === 'error'
-        ? 'bg-red-50 border-red-200'
-        : 'bg-white border-slate-200'
+        ? 'bg-red-500/10 border-red-500/30'
+        : 'bg-slate-900 border-slate-700'
     }`}>
       <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-        status === 'invalid' ? 'bg-amber-100' : status === 'error' ? 'bg-red-100' : 'bg-blue-50'
+        status === 'invalid' ? 'bg-amber-500/20' : status === 'error' ? 'bg-red-500/20' : 'bg-blue-500/15'
       }`}>
         <FileText size={16} className={
-          status === 'invalid' ? 'text-amber-500' : status === 'error' ? 'text-red-500' : 'text-blue-600'
+          status === 'invalid' ? 'text-amber-400' : status === 'error' ? 'text-red-400' : 'text-blue-400'
         } />
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-slate-800 truncate">{file.name}</p>
-        <p className="text-xs text-slate-400">{formatSize(file.size)}</p>
+        <p className="text-sm font-medium text-slate-200 truncate">{file.name}</p>
+        <p className="text-xs text-slate-500">{formatSize(file.size)}</p>
         {status === 'invalid' && rejectionReason && (
-          <p className="text-xs text-amber-600 font-medium mt-0.5">{rejectionReason}</p>
+          <p className="text-xs text-amber-400 font-medium mt-0.5">{rejectionReason}</p>
         )}
       </div>
 
@@ -53,7 +53,7 @@ export default function FileItem({ file, status, rejectionReason, onRemove }) {
       {(status === 'idle' || status === 'invalid') && (
         <button
           onClick={() => onRemove(file)}
-          className="ml-1 text-slate-300 hover:text-red-400 transition-colors flex-shrink-0"
+          className="ml-1 text-slate-400 hover:text-red-400 transition-colors flex-shrink-0"
         >
           <XCircle size={16} />
         </button>
