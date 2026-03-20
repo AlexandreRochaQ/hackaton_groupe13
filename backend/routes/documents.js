@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import multer from 'multer'
-import { createBatch, getBatch, listBatches } from '../services/batchStore.js'
+import { createBatch, getBatch, listBatches, getFilesFromDb } from '../services/batchStore.js'
 import { storeFile, getFiles } from '../services/fileBufferStore.js'
 
 const router = Router()
@@ -78,12 +78,12 @@ router.get('/batch-download', async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'No IDs provided' })
     }
 
-    const files = getFiles(ids)
+    let files = getFiles(ids)
     if (files.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Files not found. Buffer clears on server restart — re-upload to download.',
-      })
+      files = await getFilesFromDb(ids)
+    }
+    if (files.length === 0) {
+      return res.status(404).json({ success: false, error: 'Files not found.' })
     }
 
     const { default: archiver } = await import('archiver')

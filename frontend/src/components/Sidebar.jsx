@@ -1,11 +1,11 @@
 import { useLocation, useNavigate, NavLink, useParams } from 'react-router-dom'
-import { Upload, FileSearch, Building2, ShieldCheck, Layers, LayoutDashboard, Database, History, Terminal, LogOut, X } from 'lucide-react'
+import { Upload, FileSearch, Building2, ShieldCheck, Layers, LayoutDashboard, Database, History, Terminal, LogOut, X, ArrowLeft } from 'lucide-react'
 
 const operatorNav = [
-  { to: '/upload', icon: Upload, label: 'Déposer des documents' },
-  { to: '/review', icon: FileSearch, label: 'Révision & extraction', paramKey: 'batchId' },
-  { to: '/crm', icon: Building2, label: 'CRM fournisseur', paramKey: 'batchId' },
-  { to: '/compliance', icon: ShieldCheck, label: 'Outil conformité', paramKey: 'batchId' },
+  { to: '/upload',     icon: Upload,     label: 'Déposer des documents' },
+  { to: '/review',     icon: FileSearch, label: 'Révision & extraction', paramKey: 'batchId' },
+  { to: '/crm',        icon: Building2,  label: 'CRM fournisseur',       paramKey: 'batchId' },
+  { to: '/compliance', icon: ShieldCheck,label: 'Outil conformité',      paramKey: 'batchId' },
 ]
 
 const adminNav = [
@@ -15,6 +15,9 @@ const adminNav = [
   { to: '/admin', tab: 'logs',     icon: Terminal,        label: 'Logs pipeline'  },
 ]
 
+// Operator routes that admin can navigate to (review, crm, compliance)
+const OPERATOR_ROUTES = ['/review', '/crm', '/compliance', '/upload']
+
 export default function Sidebar({ onClose }) {
   const { batchId: paramBatchId } = useParams()
   const navigate = useNavigate()
@@ -22,7 +25,11 @@ export default function Sidebar({ onClose }) {
   const batchId = paramBatchId || localStorage.getItem('lastBatchId')
   const role = localStorage.getItem('role') || 'operator'
   const isAdmin = role === 'admin'
-  const navItems = isAdmin ? adminNav : operatorNav
+
+  // Admin on an operator route — show operator nav with a "Back to Admin" button
+  const isAdminOnOperatorRoute = isAdmin && OPERATOR_ROUTES.some(r => location.pathname.startsWith(r))
+
+  const navItems = (!isAdmin || isAdminOnOperatorRoute) ? operatorNav : adminNav
 
   const currentTab = new URLSearchParams(location.search).get('tab')
 
@@ -57,7 +64,7 @@ export default function Sidebar({ onClose }) {
           </div>
           <p className="text-white font-bold text-sm leading-tight">
             DocFlow{' '}
-            <span className="text-slate-600 text-xs font-mono">v1.0</span>
+            <span className="text-slate-500 text-xs font-mono">v1.0</span>
           </p>
         </div>
         {onClose && (
@@ -78,6 +85,19 @@ export default function Sidebar({ onClose }) {
           {isAdmin ? 'Administrateur' : 'Opérateur'}
         </span>
       </div>
+
+      {/* Back to Admin — shown when admin is on operator routes */}
+      {isAdminOnOperatorRoute && (
+        <div className="px-4 pt-3">
+          <button
+            onClick={() => { navigate('/admin'); onClose?.() }}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-700/60 transition-colors"
+          >
+            <ArrowLeft size={13} />
+            Retour au tableau de bord
+          </button>
+        </div>
+      )}
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-1">

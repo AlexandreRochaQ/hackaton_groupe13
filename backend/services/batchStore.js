@@ -1,4 +1,4 @@
-import { MongoClient } from 'mongodb'
+import { MongoClient, Binary } from 'mongodb'
 import { v4 as uuidv4 } from 'uuid'
 import { runRealPipeline } from './realPipeline.js'
 
@@ -18,13 +18,13 @@ async function getDb() {
 }
 
 function detectType(filename) {
-  const f = filename.toLowerCase()
-  if (f.includes('facture') || f.includes('invoice')) return 'facture'
-  if (f.includes('devis') || f.includes('quote')) return 'devis'
-  if (f.includes('kbis')) return 'kbis'
-  if (f.includes('urssaf') || f.includes('vigilance')) return 'urssaf'
-  if (f.includes('siret') || f.includes('attestation')) return 'attestation_siret'
-  if (f.includes('rib')) return 'rib'
+  const f = filename.toLowerCase().replace(/[_\-\s]/g, '')
+  if (/facture|invoice|fac\d|fact\d|inv\d/.test(f)) return 'facture'
+  if (/devis|quotation|quote|dev\d/.test(f))         return 'devis'
+  if (/kbis|kibis|extrait/.test(f))                  return 'kbis'
+  if (/urssaf|vigilance|cotisation/.test(f))          return 'urssaf'
+  if (/siret|siren|attestation/.test(f))              return 'attestation_siret'
+  if (/\brib\b|iban|bancaire|releve/.test(f))         return 'rib'
   return 'inconnu'
 }
 
@@ -52,9 +52,9 @@ export async function createBatch(files) {
 
   const db = await getDb()
 
-  // ── RAW ZONE: store file metadata immediately on upload ──
+  // ── RAW ZONE: store file metadata + binary content for persistent download ──
   await db.collection('raw_zone').insertMany(
-    documents.map(doc => ({
+    documents.map((doc, i) => ({
       batchId,
       documentId: doc.id,
       filename: doc.name,
@@ -62,6 +62,7 @@ export async function createBatch(files) {
       size: doc.size,
       detectedType: doc.type,
       uploadedAt: now,
+      fileData: files[i]?.buffer ? new Binary(files[i].buffer) : null,
     }))
   )
 
@@ -72,6 +73,7 @@ export async function createBatch(files) {
     createdAt: now,
     extraction: null,
     validation: null,
+    sireneData: null,
   }
   await db.collection('batches').insertOne(batchDoc)
 
@@ -107,6 +109,7 @@ export async function createBatch(files) {
         confidence: e.confidence,
         fields: e.fields,
         anomalies: e.anomalies,
+        sireneEnrichment: batchWithFiles.sireneData || null,
         curatedAt: new Date().toISOString(),
       }))
     )
@@ -121,6 +124,7 @@ export async function createBatch(files) {
         documents: batchWithFiles.documents,
         extraction: batchWithFiles.extraction,
         validation: batchWithFiles.validation,
+        sireneData: batchWithFiles.sireneData || null,
         ...(batchWithFiles.error ? { error: batchWithFiles.error } : {}),
       },
     }
@@ -137,12 +141,27 @@ export async function getBatch(batchId) {
 export async function getDataLakeStats(batchId) {
   const db = await getDb()
   const filter = batchId ? { batchId } : {}
-  const [rawCount, cleanCount, curatedCount] = await Promise.all([
+  const [rawCount, cleanCount, curatedCount, batchCount, curatedDocs] = await Promise.all([
     db.collection('raw_zone').countDocuments(filter),
     db.collection('clean_zone').countDocuments(filter),
     db.collection('curated_zone').countDocuments(filter),
+    db.collection('batches').countDocuments({}),
+    db.collection('curated_zone')
+      .find(filter, { projection: { _id: 0, confidence: 1, anomalies: 1 } })
+      .toArray(),
   ])
-  return { raw: rawCount, clean: cleanCount, curated: curatedCount }
+  const avgConfidence = curatedDocs.length
+    ? curatedDocs.reduce((s, d) => s + (d.confidence || 0), 0) / curatedDocs.length
+    : null
+  const totalAnomalies = curatedDocs.reduce(
+    (s, d) => s + (Array.isArray(d.anomalies) ? d.anomalies.length : 0), 0
+  )
+  const typeDistribution = {}
+  curatedDocs.forEach(d => {
+    const t = d.documentType || 'inconnu'
+    typeDistribution[t] = (typeDistribution[t] || 0) + 1
+  })
+  return { raw: rawCount, clean: cleanCount, curated: curatedCount, total_batches: batchCount, avg_confidence: avgConfidence, total_anomalies: totalAnomalies, type_distribution: typeDistribution }
 }
 
 export async function getDataLakeZone(zone, batchId) {
@@ -151,6 +170,19 @@ export async function getDataLakeZone(zone, batchId) {
   if (!validZones.includes(zone)) throw new Error('Invalid zone')
   const filter = batchId ? { batchId } : {}
   return db.collection(zone).find(filter, { projection: { _id: 0 } }).toArray()
+}
+
+export async function getFilesFromDb(docIds) {
+  const db = await getDb()
+  const docs = await db.collection('raw_zone')
+    .find(
+      { documentId: { $in: docIds } },
+      { projection: { _id: 0, documentId: 1, filename: 1, mimetype: 1, fileData: 1 } }
+    )
+    .toArray()
+  return docs
+    .filter(d => d.fileData)
+    .map(d => ({ id: d.documentId, name: d.filename, mimetype: d.mimetype, buffer: Buffer.from(d.fileData.buffer) }))
 }
 
 export async function listBatches(page = 1, limit = 10) {

@@ -23,7 +23,7 @@ function NotFound() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-3 text-slate-400">
       <p className="text-6xl font-bold text-slate-200">404</p>
-      <p className="text-lg font-medium text-slate-600">Page introuvable</p>
+      <p className="text-lg font-medium text-slate-400">Page introuvable</p>
       <p className="text-sm flex items-center gap-1.5">
         …ou peut-être mal extraite par notre OCR
         <SmilePlus size={16} className="text-slate-400" />
@@ -45,16 +45,16 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
 
-          {/* Operator routes */}
+          {/* Operator routes — also accessible by admin (e.g. review from history) */}
           <Route
             path="/"
             element={
-              <RoleGuard allowed={['operator']}>
+              <RoleGuard allowed={['operator', 'admin']}>
                 <Layout />
               </RoleGuard>
             }
           >
-            <Route index element={<Navigate to="/upload" replace />} />
+            <Route index element={<Navigate to={localStorage.getItem('role') === 'admin' ? '/admin' : '/upload'} replace />} />
             <Route path="upload" element={<UploadPage />} />
             <Route path="review/:batchId" element={<ReviewPage />} />
             <Route path="review" element={<Navigate to="/upload" replace />} />

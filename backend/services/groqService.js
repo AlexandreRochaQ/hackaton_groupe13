@@ -46,32 +46,70 @@ async function groqCall(fn) {
 const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
 const TEXT_MODEL = 'llama-3.3-70b-versatile'
 
-const EXTRACTION_PROMPT = (documentId) => `You are an expert at extracting structured information from French administrative documents (invoices, quotes, attestations, KBIS, RIB, URSSAF attestations).
+const SYSTEM_PROMPT = `You are an expert data extraction engine specialized in French B2B administrative and accounting documents used in supplier compliance verification (qualification fournisseur).
+Your sole purpose is to extract structured fields from document content and return valid JSON — nothing else.
+Never add commentary, markdown fences, preamble, or explanations. Output only the raw JSON object.`
 
-Analyze the document and extract ALL relevant information. Return a JSON object with EXACTLY these fields:
-- document_id: "${documentId}"
-- document_type: one of exactly [facture, devis, kbis, urssaf, attestation_siret, rib, inconnu]
-- company_name: company or organization name, or null
-- siret: 14-digit SIRET number as a string, or null
-- siren: 9-digit SIREN number as a string, or null
-- vat: VAT/TVA number (e.g. FR12345678901), or null
-- invoice_number: document or invoice reference number, or null
-- issue_date: issue date in YYYY-MM-DD format, or null
-- expiration_date: expiration or validity date in YYYY-MM-DD format, or null
-- amount_ht: amount excluding tax as a number (no currency symbols), or null
-- amount_ttc: amount including tax as a number (no currency symbols), or null
-- iban: IBAN number, or null
-- bic: BIC/SWIFT code, or null
-- banque: bank name, or null
-- confidence: float 0-1 based on how much was successfully extracted
-- anomalies: array of strings for any anomalies found (expired dates, TTC < HT, missing SIRET on invoice, missing TVA on invoice, etc.)
+const today = () => new Date().toISOString().split('T')[0]
 
-Rules:
-- SIRET is always 14 digits, SIREN is always 9 digits — verify digit count
-- For dates: always convert to YYYY-MM-DD (e.g. 19/10/2020 → 2020-10-19)
-- For amounts: numeric value only (e.g. 1450.00, not "1 450,00 €")
-- If a field is not present, use null (not empty string)
-- Return ONLY valid JSON, no markdown, no commentary`
+const EXTRACTION_PROMPT = (documentId) => `Extract ALL fields from this French document and return a single JSON object.
+
+DOCUMENT TYPE — choose exactly one:
+• facture      — supplier invoice: HT/TTC amounts, invoice number, VAT
+• devis        — quote/estimate: validity date, no final invoice number
+• kbis         — Registre du Commerce extract: RCS, immatriculation date, siege address
+• urssaf       — Attestation de Vigilance: social contribution period and expiry date
+• attestation_siret — INSEE/SIRET certificate (different from Kbis)
+• rib          — Bank account document: IBAN, BIC, account holder
+• inconnu      — cannot determine type
+
+OUTPUT SCHEMA (return ONLY this JSON, use null for any absent field — never "" or "N/A"):
+{
+  "document_id": "${documentId}",
+  "document_type": "<type from list above>",
+  "company_name": "<full legal company name as printed>",
+  "siret": "<exactly 14 digits, no spaces — null if wrong digit count>",
+  "siren": "<exactly 9 digits — derive from first 9 of SIRET if found>",
+  "vat": "<FR + 11 chars e.g. FR12345678901>",
+  "invoice_number": "<document/invoice reference as printed>",
+  "issue_date": "<YYYY-MM-DD>",
+  "expiration_date": "<YYYY-MM-DD — validity or expiry date>",
+  "amount_ht": <float e.g. 1450.00>,
+  "amount_ttc": <float e.g. 1741.00>,
+  "iban": "<IBAN without any spaces>",
+  "bic": "<8 or 11 char BIC/SWIFT>",
+  "banque": "<bank name>",
+  "address": "<full postal address of the main company/issuer>",
+  "legal_form": "<SAS/SARL/SA/EURL/SASU/SNC/GIE/etc.>",
+  "capital": "<share capital as string e.g. '10 000,00 €'>",
+  "activity": "<NAF/APE code + label e.g. '6201Z — Programmation informatique'>",
+  "confidence": <float 0.0–1.0>,
+  "anomalies": ["<specific issue string>"]
+}
+
+EXTRACTION RULES:
+1. SIRET: must be exactly 14 digits. Wrong count → set null, add anomaly.
+2. SIREN: first 9 digits of SIRET. Auto-derive if SIRET is present.
+3. Dates — ALWAYS convert to YYYY-MM-DD:
+   "19/10/2020"→"2020-10-19" | "19 octobre 2020"→"2020-10-19" | "19-10-20"→"2020-10-19"
+4. Amounts — ALWAYS convert to float:
+   "1 450,00 €"→1450.00 | "2.500,50"→2500.50 | "1 450"→1450.0
+5. IBAN: remove ALL spaces before storing.
+6. TVA: French format "FR" + 2 alphanumeric chars + 9-digit SIREN.
+
+ANOMALY DETECTION (add each that applies — today is ${today()}):
+• "SIRET manquant sur facture" — type facture/devis but siret is null
+• "TVA manquante sur facture" — type facture/devis but vat is null
+• "Numéro de document manquant" — type facture/devis but invoice_number is null
+• "Montant TTC inférieur au HT" — amount_ttc < amount_ht
+• "TVA non appliquée" — type facture and amount_ttc == amount_ht
+• "Document expiré" — expiration_date is before ${today()}
+• "Kbis potentiellement périmé" — type kbis and issue_date > 90 days before ${today()}
+• "SIRET invalide" — SIRET found but not exactly 14 digits
+• "IBAN format invalide" — IBAN found but invalid format
+• "Incohérence de dates" — issue_date is after expiration_date
+
+CONFIDENCE: 0.9+ all key fields clean · 0.7–0.9 most fields · 0.5–0.7 several missing · <0.5 unreadable`
 
 /**
  * Pre-process an image buffer with sharp:
@@ -155,13 +193,17 @@ async function extractPdfText(buffer) {
  * Applies pre-processing before sending.
  * Returns { rawText, structured }.
  */
-async function extractFromImage(buffer, mimeType, documentId) {
+async function extractFromImage(buffer, documentId) {
   const processed = await preprocessImage(buffer)
   const base64 = processed.toString('base64')
 
   const completion = await groqCall(groq => groq.chat.completions.create({
     model: VISION_MODEL,
     messages: [
+      {
+        role: 'system',
+        content: SYSTEM_PROMPT,
+      },
       {
         role: 'user',
         content: [
@@ -176,8 +218,8 @@ async function extractFromImage(buffer, mimeType, documentId) {
         ],
       },
     ],
-    temperature: 0.1,
-    max_tokens: 1024,
+    temperature: 0.05,
+    max_tokens: 1500,
   }))
 
   const content = completion.choices[0]?.message?.content || '{}'
@@ -187,15 +229,15 @@ async function extractFromImage(buffer, mimeType, documentId) {
 
 /**
  * Extract from multiple page images (used for scanned PDFs).
- * Sends up to 3 pages; merges results from first successful page.
+ * Merges fields across all pages: starts with the highest-confidence result
+ * and fills null fields from other pages for maximum data completeness.
  */
 async function extractFromPageImages(images, documentId) {
-  // Try all pages and use the most confident result
   const results = []
 
   for (const imgBuffer of images) {
     try {
-      const result = await extractFromImage(imgBuffer, 'image/jpeg', documentId)
+      const result = await extractFromImage(imgBuffer, documentId)
       results.push(result)
     } catch (err) {
       console.warn('[groqService] Page extraction failed:', err.message)
@@ -209,10 +251,32 @@ async function extractFromPageImages(images, documentId) {
     }
   }
 
-  // Return result with highest confidence
-  return results.reduce((best, cur) =>
-    (cur.structured?.confidence ?? 0) > (best.structured?.confidence ?? 0) ? cur : best
+  if (results.length === 1) return results[0]
+
+  // Sort by confidence descending, start with best result
+  const sorted = [...results].sort((a, b) =>
+    (b.structured?.confidence ?? 0) - (a.structured?.confidence ?? 0)
   )
+  const merged = { ...sorted[0].structured }
+  const mergedAnomalies = new Set(merged.anomalies || [])
+
+  // Fill null fields from lower-confidence pages
+  for (const result of sorted.slice(1)) {
+    const s = result.structured || {}
+    for (const key of Object.keys(s)) {
+      if (key === 'anomalies') {
+        ;(s.anomalies || []).forEach(a => mergedAnomalies.add(a))
+        continue
+      }
+      if (key === 'confidence' || key === 'document_id') continue
+      if (merged[key] === null || merged[key] === undefined) {
+        merged[key] = s[key]
+      }
+    }
+  }
+  merged.anomalies = [...mergedAnomalies]
+
+  return { rawText: sorted[0].rawText, structured: merged }
 }
 
 /**
@@ -224,12 +288,16 @@ async function extractFromText(rawText, documentId) {
     model: TEXT_MODEL,
     messages: [
       {
+        role: 'system',
+        content: SYSTEM_PROMPT,
+      },
+      {
         role: 'user',
-        content: `${EXTRACTION_PROMPT(documentId)}\n\nDOCUMENT TEXT:\n${rawText}\n\nReturn ONLY the JSON object:`,
+        content: `${EXTRACTION_PROMPT(documentId)}\n\nDOCUMENT TEXT:\n${rawText}`,
       },
     ],
-    temperature: 0.1,
-    max_tokens: 1024,
+    temperature: 0.05,
+    max_tokens: 1500,
     response_format: { type: 'json_object' },
   }))
 
@@ -269,7 +337,7 @@ export async function extractDocument(buffer, filename, mimeType, documentId) {
   }
 
   // Image file (JPG, PNG, WEBP, etc.) — pre-process then Vision
-  return extractFromImage(buffer, mimeType, documentId)
+  return extractFromImage(buffer, documentId)
 }
 
 /**
@@ -301,6 +369,10 @@ function parseJson(content, documentId) {
       iban: null,
       bic: null,
       banque: null,
+      address: null,
+      legal_form: null,
+      capital: null,
+      activity: null,
       confidence: 0,
       anomalies: ['Extraction failed — could not parse document'],
     }

@@ -17,21 +17,55 @@ router.get('/:batchId', async (req, res, next) => {
 
     const src = byType.kbis || byType.facture || byType.devis || byType.attestation_siret || {}
     const rib = byType.rib || {}
+    const sirene = batch.sireneData || null
+
+    // OCR-extracted values (primary source)
+    const ocrRaisonSociale = src.raisonSociale?.value || src.fournisseur?.value || ''
+    const ocrFormeJuridique = src.formeJuridique?.value || ''
+    const ocrAdresse = src.adresse?.value || ''
+    const ocrActivite = src.activite?.value || ''
+
+    // SIRENE enrichment: fill gaps when OCR didn't extract the field
+    const sireneFound = sirene?.found === true
+    const enrichedRaisonSociale = ocrRaisonSociale || (sireneFound ? sirene.raisonSociale : '') || ''
+    const enrichedFormeJuridique = ocrFormeJuridique || (sireneFound ? sirene.formeJuridique : '') || ''
+    const enrichedAdresse = ocrAdresse || (sireneFound ? sirene.adresse : '') || ''
+    const enrichedActivite = ocrActivite || (sireneFound ? sirene.libelleActivite : '') || ''
+
+    // Track which fields came from SIRENE vs OCR
+    const sireneFields = []
+    if (!ocrRaisonSociale && enrichedRaisonSociale) sireneFields.push('raisonSociale')
+    if (!ocrFormeJuridique && enrichedFormeJuridique) sireneFields.push('formeJuridique')
+    if (!ocrAdresse && enrichedAdresse) sireneFields.push('adresse')
+    if (!ocrActivite && enrichedActivite) sireneFields.push('activite')
 
     res.json({
       success: true,
       data: {
-        raisonSociale: src.raisonSociale?.value || src.fournisseur?.value || '',
+        raisonSociale: enrichedRaisonSociale,
         siret: src.siret?.value || '',
         tva: src.tva?.value || '',
-        formeJuridique: src.formeJuridique?.value || '',
+        formeJuridique: enrichedFormeJuridique,
         capital: src.capital?.value || '',
-        adresse: src.adresse?.value || '',
-        activite: src.activite?.value || '',
-        iban: rib.iban?.value || '',
-        bic: rib.bic?.value || '',
-        banque: rib.banque?.value || '',
+        adresse: enrichedAdresse,
+        activite: enrichedActivite,
+        iban: rib.iban?.value || src.iban?.value || '',
+        bic: rib.bic?.value || src.bic?.value || '',
+        banque: rib.banque?.value || src.banque?.value || '',
         _sourceDocuments: extraction.map(e => e.typeLabel),
+        _sireneData: sirene ? {
+          found: sirene.found,
+          isActive: sirene.isActive,
+          raisonSociale: sirene.raisonSociale,
+          siret: sirene.siret,
+          siren: sirene.siren,
+          codePostal: sirene.codePostal,
+          commune: sirene.commune,
+          dateCreation: sirene.dateCreation,
+          categorieEntreprise: sirene.categorieEntreprise,
+          nameMatchScore: sirene.nameMatchScore,
+        } : null,
+        _sireneFields: sireneFields,
       },
     })
   } catch (err) {

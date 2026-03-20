@@ -40,13 +40,35 @@ router.get('/:batchId', async (req, res, next) => {
         ? `Attestation expirée le ${urssafDateVal} — renouvellement requis`
         : `Attestation valide jusqu'au ${urssafDateVal}`
 
-    const globalNonConforme = hasCritiques || urssafExpired
+    const sireneData = batch.sireneData || null
+    const sireneClosed = sireneData?.found && !sireneData.isActive
+    const globalNonConforme = hasCritiques || urssafExpired || sireneClosed
+
+    const sireneCheck = sireneData ? {
+      label: 'Vérification SIRENE officielle',
+      status: !sireneData.found ? 'non_conforme' : sireneData.isActive ? 'conforme' : 'non_conforme',
+      detail: !sireneData.found
+        ? `SIRET ${sireneData.siret} introuvable dans la base SIRENE`
+        : sireneData.isActive
+        ? `Entreprise active : ${sireneData.raisonSociale}`
+        : `Entreprise fermée selon SIRENE : ${sireneData.raisonSociale}`,
+      raisonSociale: sireneData.raisonSociale || null,
+      isActive: sireneData.isActive,
+    } : null
 
     res.json({
       success: true,
       data: {
-        fournisseur: kbis.raisonSociale?.value || facture.fournisseur?.value || '',
+        fournisseur: kbis.raisonSociale?.value || facture.fournisseur?.value || sireneData?.raisonSociale || '',
         siret: facture.siret?.value || kbis.siret?.value || '',
+        sireneData: sireneData ? {
+          found: sireneData.found,
+          isActive: sireneData.isActive,
+          raisonSociale: sireneData.raisonSociale,
+          siret: sireneData.siret,
+          commune: sireneData.commune,
+          dateCreation: sireneData.dateCreation,
+        } : null,
         checks: {
           urssaf: {
             label: 'Attestation de vigilance URSSAF',
@@ -68,6 +90,7 @@ router.get('/:batchId', async (req, res, next) => {
               ? 'Incohérences SIRET détectées entre les documents fournis'
               : 'SIRET cohérent sur tous les documents',
           },
+          ...(sireneCheck ? { sirene: sireneCheck } : {}),
         },
         globalStatus: globalNonConforme ? 'non_conforme' : 'conforme',
         inconsistencies: validation.inconsistencies,

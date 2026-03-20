@@ -66,22 +66,22 @@ export default function DocumentCard({ doc, extraction, isSelected, onClick, onT
         onClick={onClick}
         className={`w-full text-left flex items-start gap-3 px-4 py-3.5 rounded-xl border transition-all cursor-pointer ${
           isSelected
-            ? 'border-brand-300 bg-brand-50/60 shadow-sm'
-            : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+            ? 'border-brand-500 bg-brand-500/10 shadow-sm'
+            : 'border-slate-700 bg-slate-800/60 hover:border-slate-600 hover:bg-slate-800'
         }`}
       >
-        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${isSelected ? 'bg-brand-100' : 'bg-blue-50'}`}>
-          <TypeIcon size={15} className={isSelected ? 'text-brand-600' : 'text-blue-600'} />
+        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${isSelected ? 'bg-brand-500/20' : 'bg-blue-500/15'}`}>
+          <TypeIcon size={15} className={isSelected ? 'text-brand-400' : 'text-blue-400'} />
         </div>
 
         <div className="flex-1 min-w-0 pl-4">
-          <p className="text-sm font-medium text-slate-800 truncate">{doc.name}</p>
+          <p className="text-sm font-medium text-slate-200 truncate">{doc.name}</p>
 
           {/* Confidence bar */}
           {ext && (
             <Tooltip text="Détecté automatiquement par IA — confiance de classification">
               <div className="mt-1.5 flex items-center gap-2 cursor-help">
-                <div className="flex-1 h-1 bg-slate-100 rounded-full overflow-hidden">
+                <div className="flex-1 h-1 bg-slate-700 rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all duration-500"
                     style={{
@@ -90,7 +90,7 @@ export default function DocumentCard({ doc, extraction, isSelected, onClick, onT
                     }}
                   />
                 </div>
-                <span className="text-xs text-slate-400">{Math.round(ext.confidence * 100)}%</span>
+                <span className="text-xs text-slate-500">{Math.round(ext.confidence * 100)}%</span>
               </div>
             </Tooltip>
           )}
@@ -99,7 +99,7 @@ export default function DocumentCard({ doc, extraction, isSelected, onClick, onT
           {isLowConfidence && (
             <div className="mt-1.5 flex items-center gap-1">
               <AlertCircle size={11} className="text-amber-500 animate-pulse" />
-              <span className="text-xs text-amber-600 font-medium">À classifier manuellement</span>
+              <span className="text-xs text-amber-400 font-medium">À classifier manuellement</span>
             </div>
           )}
 
@@ -113,7 +113,7 @@ export default function DocumentCard({ doc, extraction, isSelected, onClick, onT
                 <select
                   value={ext.type}
                   onChange={handleTypeChange}
-                  className="text-xs pl-2 pr-6 py-1 rounded border border-slate-200 bg-white text-slate-600 appearance-none focus:outline-none focus:ring-1 focus:ring-brand-400 hover:border-slate-300 cursor-pointer"
+                  className="text-xs pl-2 pr-6 py-1 rounded border border-slate-700 bg-slate-800 text-slate-300 appearance-none focus:outline-none focus:ring-1 focus:ring-brand-500 hover:border-slate-600 cursor-pointer"
                 >
                   {DOC_TYPES.map(t => (
                     <option key={t.value} value={t.value}>{t.label}</option>

@@ -5,12 +5,18 @@ function parseDate(value) {
   return new Date(value)
 }
 
-export function validateExtractions(extractions) {
+/**
+ * Validate extractions with optional SIRENE enrichment.
+ * @param {Array} extractions — result of nerToExtraction()
+ * @param {object|null} sireneData — result of sireneService.lookupSiret(), or null
+ */
+export function validateExtractions(extractions, sireneData = null) {
   const byType = {}
   extractions.forEach(e => { byType[e.type] = e.fields })
 
   const inconsistencies = []
 
+  // ── Inter-document SIRET coherence ──
   const docsWithSiret = extractions.filter(e => e.fields.siret?.value)
   if (docsWithSiret.length > 1) {
     const unique = [...new Set(docsWithSiret.map(e => e.fields.siret.value))]
@@ -41,6 +47,7 @@ export function validateExtractions(extractions) {
     }
   }
 
+  // ── URSSAF expiry ──
   const urssaf = byType.urssaf
   if (urssaf?.dateExpiration?.value) {
     const expDate = parseDate(urssaf.dateExpiration.value)
@@ -57,6 +64,7 @@ export function validateExtractions(extractions) {
     }
   }
 
+  // ── Kbis expiry ──
   const kbis = byType.kbis
   if (kbis?.dateExpiration?.value) {
     const expDate = parseDate(kbis.dateExpiration.value)
@@ -73,6 +81,72 @@ export function validateExtractions(extractions) {
     }
   }
 
+  // ── SIRENE-based checks ──
+  if (sireneData !== null) {
+    if (!sireneData.found) {
+      // SIRET submitted but not found in SIRENE
+      inconsistencies.push({
+        id: 'inc-sirene-not-found',
+        severity: 'critique',
+        code: 'SIRENE_NOT_FOUND',
+        title: 'SIRET non reconnu par SIRENE',
+        description: `Le numéro SIRET ${sireneData.siret} est introuvable dans la base SIRENE des entreprises (data.gouv.fr). Ce numéro est invalide ou n'existe pas.`,
+        affectedDocuments: docsWithSiret.map(e => e.typeLabel),
+        values: { SIRET: sireneData.siret },
+      })
+    } else {
+      // SIRET found — check company status
+      if (!sireneData.isActive) {
+        inconsistencies.push({
+          id: 'inc-sirene-closed',
+          severity: 'critique',
+          code: 'ENTREPRISE_FERMÉE',
+          title: 'Entreprise fermée selon SIRENE',
+          description: `Selon la base SIRENE officielle, l'établissement lié au SIRET ${sireneData.siret} est fermé (état administratif : ${sireneData.etatAdministratif}). Tout engagement financier est risqué.`,
+          affectedDocuments: docsWithSiret.map(e => e.typeLabel),
+          values: {
+            SIRET: sireneData.siret,
+            'Raison sociale': sireneData.raisonSociale,
+            'État': sireneData.etatAdministratif,
+          },
+        })
+      } else {
+        // Active — confirm with SIRENE badge
+        inconsistencies.push({
+          id: 'val-sirene-active',
+          severity: 'ok',
+          code: 'SIRENE_ACTIVE',
+          title: 'Entreprise active — validé par SIRENE',
+          description: `Le SIRET ${sireneData.siret} correspond à une entreprise active dans la base SIRENE officielle : "${sireneData.raisonSociale}".`,
+          affectedDocuments: docsWithSiret.map(e => e.typeLabel),
+          values: {
+            'Raison sociale officielle': sireneData.raisonSociale,
+            'SIRET': sireneData.siret,
+            'Activité': sireneData.libelleActivite || '—',
+            'Forme juridique': sireneData.formeJuridique || '—',
+          },
+        })
+      }
+
+      // Name mismatch — warning (not critical, OCR can misread)
+      if (sireneData.nameMatchScore !== null && sireneData.nameMatchScore < 0.5) {
+        inconsistencies.push({
+          id: 'warn-sirene-name',
+          severity: 'avertissement',
+          code: 'NOM_DIFFÉRENT_SIRENE',
+          title: 'Nom extrait différent du nom officiel',
+          description: `Le nom extrait par l'IA ("${sireneData.extractedName}") diffère significativement du nom officiel dans SIRENE ("${sireneData.raisonSociale}"). Vérifiez si le document appartient bien à cette entreprise.`,
+          affectedDocuments: docsWithSiret.map(e => e.typeLabel),
+          values: {
+            'Nom extrait': sireneData.extractedName || '—',
+            'Nom officiel (SIRENE)': sireneData.raisonSociale,
+            'Score de correspondance': `${Math.round((sireneData.nameMatchScore ?? 0) * 100)}%`,
+          },
+        })
+      }
+    }
+  }
+
   return {
     summary: {
       total: extractions.length,
@@ -82,5 +156,6 @@ export function validateExtractions(extractions) {
       isCompliant: inconsistencies.filter(i => i.severity === 'critique').length === 0,
     },
     inconsistencies,
+    sireneData: sireneData ?? null,
   }
 }
