@@ -50,6 +50,8 @@ wheels/
 .installed.cfg
 .Python
 
+hackaton_groupe13\mongodb_data
+
 venv/
 .venv/
 env/

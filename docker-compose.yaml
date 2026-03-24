@@ -23,6 +23,21 @@ x-airflow-common: &airflow-common
     - docuflow-net
 
 services:
+  mongodb:
+    image: mongo:7.0
+    environment:
+      MONGO_INITDB_DB: docuflow
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      retries: 5
+    networks:
+      - docuflow-net
+
   postgres:
     image: postgres:15-alpine
     environment:
@@ -72,13 +87,16 @@ services:
       - /app/node_modules
     environment:
       PORT: 3001
-      MONGO_URI: ${MONGO_URI}
-      MONGO_DB: ${MONGO_DB}
+      MONGO_URI: mongodb://mongodb:27017/
+      MONGO_DB: docuflow
       GROQ_API_KEY: ${GROQ_API_KEY}
       AIRFLOW_URL: http://airflow-webserver:8080
       AIRFLOW_USER: admin
       AIRFLOW_PASS: admin
       USE_MOCK_SERVICES: "false"
+    depends_on:
+      mongodb:
+        condition: service_healthy
     networks:
       - docuflow-net
 
@@ -96,6 +114,7 @@ services:
       - docuflow-net
 
 volumes:
+  mongodb-data:
   postgres-data:
   uploads-data:
 
