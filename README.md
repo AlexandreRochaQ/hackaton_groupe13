@@ -89,7 +89,19 @@ MONGO_DB=docuflow
 
 # Backend
 PORT=3001
+JWT_SECRET=fixed-secret-strong-string
 ```
+
+### Authentification SQL (SQLite)
+
+- Route d'inscription : `POST /api/auth/register`
+  - Body JSON : `{ "email": "...", "password": "...", "role": "user|admin", "name": "..." }`
+- Route de connexion : `POST /api/auth/login`
+  - Body JSON : `{ "email": "...", "password": "..." }`
+- Route profil : `GET /api/auth/me` (header `Authorization: Bearer <token>`)
+- Admin seulement : `GET /api/auth/users` (header `Authorization: Bearer <token>`)
+
+Le backend crée automatiquement le fichier SQLite dans `backend/data/auth.sqlite` et initialise la table `users`.
 
 ### Lancement
 
