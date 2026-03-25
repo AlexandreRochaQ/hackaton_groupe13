@@ -1,5 +1,6 @@
 import { useLocation, useNavigate, NavLink, useParams } from 'react-router-dom'
 import { Upload, FileSearch, Building2, ShieldCheck, Layers, LayoutDashboard, Database, History, Terminal, LogOut, X, ArrowLeft } from 'lucide-react'
+import { logout } from '../api/auth.js'
 
 const operatorNav = [
   { to: '/upload',     icon: Upload,     label: 'Déposer des documents' },
@@ -49,8 +50,8 @@ export default function Sidebar({ onClose }) {
     return location.pathname.startsWith(item.to)
   }
 
-  function switchRole() {
-    localStorage.removeItem('role')
+  function handleLogout() {
+    logout()
     navigate('/login', { replace: true })
   }
 
@@ -132,11 +133,11 @@ export default function Sidebar({ onClose }) {
           <span className="text-slate-500">Services actifs</span>
         </div>
         <button
-          onClick={switchRole}
+          onClick={handleLogout}
           className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 text-xs mb-3"
         >
           <LogOut size={14} />
-          Changer de profil
+          Déconnexion
         </button>
       </div>
     </aside>

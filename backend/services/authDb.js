@@ -5,11 +5,14 @@ import knex from 'knex'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 export const db = knex({
-  client: 'sqlite3',
+  client: 'mysql2',
   connection: {
-    filename: resolve(__dirname, '../data/auth.sqlite'),
+    host: 'localhost',
+    port: 3306,
+    user: 'root',
+    password: 'root',
+    database: 'docuflow',
   },
-  useNullAsDefault: true,
 })
 
 export async function initAuthSchema() {

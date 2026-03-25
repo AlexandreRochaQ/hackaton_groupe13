@@ -5,7 +5,7 @@ import { db } from './authDb.js'
 const JWT_SECRET = process.env.JWT_SECRET || 'change-me-to-a-strong-secret'
 const JWT_EXPIRES = '12h'
 
-export async function createUser({ email, password, role = 'user', name }) {
+export async function createUser({ email, password, role = 'operator', name }) {
   const existing = await db('users').where({ email }).first()
   if (existing) {
     const err = new Error('Email already registered')
@@ -21,12 +21,14 @@ export async function createUser({ email, password, role = 'user', name }) {
 export async function authenticate(email, password) {
   const user = await db('users').where({ email }).first()
   if (!user) {
+    console.log('User not found for email:', email)
     const err = new Error('Invalid credentials')
     err.status = 401
     throw err
   }
 
   const match = await bcrypt.compare(password, user.passwordHash)
+  console.log('Password match for user:', user.email, match)
   if (!match) {
     const err = new Error('Invalid credentials')
     err.status = 401

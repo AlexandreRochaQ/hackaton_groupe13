@@ -10,10 +10,13 @@ import AdminPage from './features/admin/AdminPage.jsx'
 import { ToastProvider } from './components/Toast.jsx'
 
 function RoleGuard({ allowed, children }) {
+  const token = localStorage.getItem('token')
   const role = localStorage.getItem('role')
-  if (!role) return <Navigate to="/login" replace />
-  if (!allowed.includes(role)) {
-    return <Navigate to={role === 'admin' ? '/admin' : '/upload'} replace />
+  const normalizedRole = role === 'user' ? 'operator' : role
+
+  if (!token) return <Navigate to="/login" replace />
+  if (!allowed.includes(normalizedRole)) {
+    return <Navigate to={normalizedRole === 'admin' ? '/admin' : '/upload'} replace />
   }
   return children
 }
@@ -54,7 +57,7 @@ export default function App() {
               </RoleGuard>
             }
           >
-            <Route index element={<Navigate to={localStorage.getItem('role') === 'admin' ? '/admin' : '/upload'} replace />} />
+            <Route index element={localStorage.getItem('token') ? <Navigate to={localStorage.getItem('role') === 'admin' ? '/admin' : '/upload'} replace /> : <LoginPage />} />
             <Route path="upload" element={<UploadPage />} />
             <Route path="review/:batchId" element={<ReviewPage />} />
             <Route path="review" element={<Navigate to="/upload" replace />} />
