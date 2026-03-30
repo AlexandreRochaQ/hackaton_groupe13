@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon app.js",
-    "start": "node app.js"
+    "start": "node app.js",
+    "test": "jest"
   },
   "dependencies": {
     "archiver": "^7.0.1",
@@ -31,6 +32,9 @@
     "pdfjs-dist": "^5.5.207"
   },
   "devDependencies": {
+    "@babel/core": "^7.29.0",
+    "@babel/preset-env": "^7.29.2",
+    "jest": "^30.3.0",
     "nodemon": "^3.1.3"
   }
 }
