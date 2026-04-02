@@ -1,6 +1,7 @@
 import { MongoClient, Binary } from 'mongodb'
 import { v4 as uuidv4 } from 'uuid'
 import { runRealPipeline } from './realPipeline.js'
+import { db as sqlDb } from './authDb.js'
 
 // Cached connection for serverless warm reuse
 let cachedClient = null
@@ -39,7 +40,7 @@ function detectType(filename) {
  */
 export async function createBatch(files) {
   const batchId = uuidv4()
-  const now = new Date().toISOString()
+  const now = new Date()
 
   const documents = files.map(f => ({
     id: uuidv4(),
@@ -53,7 +54,7 @@ export async function createBatch(files) {
   const db = await getDb()
 
   // ── RAW ZONE: store file metadata + binary content for persistent download ──
-  await db.collection('raw_zone').insertMany(
+  const rawZoneResult = await db.collection('raw_zone').insertMany(
     documents.map((doc, i) => ({
       batchId,
       documentId: doc.id,
@@ -65,6 +66,30 @@ export async function createBatch(files) {
       fileData: files[i]?.buffer ? new Binary(files[i].buffer) : null,
     }))
   )
+
+  // Attach Mongo document IDs to the document objects for SQL cross-reference
+  documents.forEach((doc, i) => {
+    const insertedObjectId = rawZoneResult.insertedIds[i]
+    doc.mongoId = insertedObjectId ? insertedObjectId.toString() : null
+  })
+
+  // ── SQL DOCUMENTS TABLE: store normalized metadata and Mongo reference ──
+  try {
+    await sqlDb('documents').insert(
+      documents.map((doc) => ({
+        id: doc.id,
+        batch_id: batchId,
+        name: doc.name,
+        type: doc.type,
+        date_upload: now,
+        utilisateur_id: null,
+        mongo_id: doc.mongoId,
+        status: 'uploaded',
+      }))
+    )
+  } catch (sqlErr) {
+    console.warn('SQL documents insert failed:', sqlErr)
+  }
 
   const batchDoc = {
     batchId,
