@@ -1,4 +1,4 @@
-import { validateExtractions } from '../services/validationService.js'
+import { validateExtractions } from '../src/services/validationService.js'
 
 describe('validationService', () => {
   describe('validateExtractions', () => {

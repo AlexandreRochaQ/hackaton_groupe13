@@ -3,7 +3,7 @@ import { jest } from '@jest/globals'
 // Mock des dépendances
 jest.mock('bcrypt')
 jest.mock('jsonwebtoken')
-jest.mock('../services/authDb.js', () => ({
+jest.mock('../src/services/authDb.js', () => ({
   db: jest.fn(() => ({
     where: jest.fn(() => ({ first: jest.fn() })),
     insert: jest.fn(),
@@ -13,8 +13,8 @@ jest.mock('../services/authDb.js', () => ({
 
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
-import { createUser, authenticate, getUserById, listUsers, verifyToken } from '../services/authService.js'
-import { db } from '../services/authDb.js'
+import { createUser, authenticate, getUserById, listUsers, verifyToken } from '../src/services/authService.js'
+import { db } from '../src/services/authDb.js'
 
 describe('authService', () => {
   beforeEach(() => {

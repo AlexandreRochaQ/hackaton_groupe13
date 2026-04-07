@@ -78,7 +78,7 @@ services:
 
   api-backend:
     build:
-      context: ./backend
+      context: ./apps/backend
       dockerfile: Dockerfile
     ports:
       - "3001:3001"
@@ -102,7 +102,7 @@ services:
 
   frontend:
     build:
-      context: ./frontend
+      context: ./apps/frontend
       dockerfile: Dockerfile
       args:
         VITE_API_URL: http://localhost:3001
