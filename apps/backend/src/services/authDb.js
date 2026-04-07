@@ -1,18 +1,21 @@
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
+import { mkdirSync } from 'fs'
 import knex from 'knex'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
+const sqliteDir = resolve(__dirname, '../../data')
+const sqliteFile = resolve(sqliteDir, 'auth.sqlite')
+
+mkdirSync(sqliteDir, { recursive: true })
+
 export const db = knex({
-  client: 'mysql2',
+  client: 'sqlite3',
   connection: {
-    host: 'localhost',
-    port: 3306,
-    user: 'root',
-    password: 'root',
-    database: 'docuflow',
+    filename: sqliteFile,
   },
+  useNullAsDefault: true,
 })
 
 export async function initAuthSchema() {
